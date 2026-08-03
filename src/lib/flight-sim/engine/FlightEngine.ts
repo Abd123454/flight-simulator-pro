@@ -105,8 +105,8 @@ export class FlightEngine {
     this.weather = new WeatherSystem()
     this.weather.setWind(5, 270) // light breeze from the west
 
-    // initial camera placement (chase)
-    this.cam.camera.position.set(0, 20, -1300)
+    // initial camera placement (chase) — behind the aircraft at the south end
+    this.cam.camera.position.set(0, 20, 1500)
   }
 
   /** Start the render loop only (scene visible behind menus). Physics idle. */
@@ -254,16 +254,18 @@ export class FlightEngine {
     if (this.onState) {
       const info = this.renderer.info
       const s = this.state
-      // ILS for the northbound runway (threshold at z=-1500, approach from south).
+      // ILS for the northbound runway. Aircraft starts at z=+1400 (south end)
+      // and flies north (-Z) toward the far threshold at z=-1500.
       // Localizer: lateral deviation from runway centerline (x=0).
-      // Glideslope: vertical deviation from 3° descent path to threshold.
-      const rwyThresholdZ = -1500
-      const distToThreshold = Math.abs(s.position.z - rwyThresholdZ)
-      const onApproach = s.position.z < rwyThresholdZ + 200 && distToThreshold < 8000
-      // ideal altitude at this distance for a 3° glideslope
-      const idealAlt = Math.max(0, (rwyThresholdZ - s.position.z) * Math.tan(3 * Math.PI / 180)) + PHYS.groundY
-      const gsDev = (s.altitude - idealAlt) / 100 // normalize: ~100m = full scale
-      const locDev = -s.position.x / 100 // normalize: ~100m = full scale
+      // Glideslope: vertical deviation from 3° descent path to the north threshold.
+      const rwyThresholdZ = -1500 // north end
+      // Approach range: aircraft is northbound, approaching the north threshold
+      const onApproach = s.position.z > rwyThresholdZ - 500 && s.position.z < rwyThresholdZ + 9000
+      // ideal altitude at this distance for a 3° glideslope to the threshold
+      const distToThreshold = s.position.z - rwyThresholdZ // positive when south of threshold
+      const idealAlt = Math.max(0, distToThreshold * Math.tan(3 * Math.PI / 180)) + PHYS.groundY
+      const gsDev = (s.altitude - idealAlt) / 100
+      const locDev = -s.position.x / 100
       this.onState({
         state: s,
         fps: this.fps,
