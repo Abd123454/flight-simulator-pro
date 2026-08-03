@@ -10,6 +10,10 @@ export class InputController {
   private pauseQueued = false
   private debugQueued = false
   private resetQueued = false
+  private flapsUpQueued = false
+  private flapsDownQueued = false
+  private spoilerToggleQueued = false
+  private reverseToggleQueued = false
   enabled = true
   sensitivity = 1
 
@@ -21,7 +25,6 @@ export class InputController {
     if (e.code) this.down.delete(e.code)
     if (e.key) {
       this.down.delete(e.key.toLowerCase())
-      // also clear shift-state artifact 'shift' toggling capitalization
       if (e.key === 'Shift') this.down.delete('shift')
     }
   }
@@ -58,6 +61,13 @@ export class InputController {
       this.debugQueued = true
     }
     if (code === 'KeyR' || e.key === 'r' || e.key === 'R') this.resetQueued = true
+    // flaps: F = extend, V = retract (V near F, avoids browser conflict)
+    if (code === 'KeyF' || e.key === 'f' || e.key === 'F') this.flapsDownQueued = true
+    if (code === 'KeyV' || e.key === 'v' || e.key === 'V') this.flapsUpQueued = true
+    // spoilers / airbrake
+    if (code === 'KeyB' || e.key === 'b' || e.key === 'B') this.spoilerToggleQueued = true
+    // reverse thrust
+    if (code === 'KeyX' || e.key === 'x' || e.key === 'X') this.reverseToggleQueued = true
   }
 
   private onKeyUp = (e: KeyboardEvent) => {
@@ -116,6 +126,26 @@ export class InputController {
   consumeReset() {
     const v = this.resetQueued
     this.resetQueued = false
+    return v
+  }
+  consumeFlapsDown() {
+    const v = this.flapsDownQueued
+    this.flapsDownQueued = false
+    return v
+  }
+  consumeFlapsUp() {
+    const v = this.flapsUpQueued
+    this.flapsUpQueued = false
+    return v
+  }
+  consumeSpoilerToggle() {
+    const v = this.spoilerToggleQueued
+    this.spoilerToggleQueued = false
+    return v
+  }
+  consumeReverseToggle() {
+    const v = this.reverseToggleQueued
+    this.reverseToggleQueued = false
     return v
   }
 

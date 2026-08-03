@@ -109,7 +109,34 @@ export class Airport {
     // ---------- Windsock ----------
     this.buildWindsock(34, 0, -1450)
 
+    // ---------- PAPI lights (glide slope guidance) ----------
+    // 4 lights per side, near each threshold. Red = too low, White = too high,
+    // 2 red + 2 white = on glideslope (~3°).
+    this.buildPAPI(20, 0, -1440, -1) // approach from south (facing north threshold)
+    this.buildPAPI(20, 0, 1440, 1) // approach from north (facing south threshold)
+
     this.group.add(this.windsock)
+  }
+
+  private buildPAPI(x: number, y: number, z: number, dir: number) {
+    const papiGroup = new THREE.Group()
+    for (let i = 0; i < 4; i++) {
+      // alternate: outer two = red (low), inner two = white (high) — simplified
+      // static appearance; actual color logic computed in update() is complex,
+      // so we show a fixed pattern: 2 white (far) + 2 red (near) = on slope.
+      const isRed = i < 2
+      const mat = new THREE.MeshStandardMaterial({
+        color: isRed ? 0xff2020 : 0xffffff,
+        emissive: isRed ? 0xff1010 : 0xffffcc,
+        emissiveIntensity: 2.5,
+      })
+      const light = new THREE.Mesh(new THREE.SphereGeometry(0.8, 8, 8), mat)
+      light.position.set(i * 5 - 7.5, 1.5, 0)
+      papiGroup.add(light)
+    }
+    papiGroup.position.set(x, y, z)
+    papiGroup.rotation.y = dir > 0 ? Math.PI : 0
+    this.group.add(papiGroup)
   }
 
   private buildTerminal() {

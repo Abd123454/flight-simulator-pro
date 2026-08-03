@@ -5,6 +5,12 @@ import type { CameraMode, GamePhase } from '@/lib/flight-sim/types'
 import { Hud } from './Hud'
 import { MainMenu, PauseMenu, EndScreen } from './Menus'
 
+interface Settings {
+  sensitivity: number
+  volume: number
+  muted: boolean
+}
+
 export function FlightSimulator() {
   const containerRef = useRef<HTMLDivElement>(null)
   const engineRef = useRef<FlightEngine | null>(null)
@@ -15,9 +21,25 @@ export function FlightSimulator() {
   const [result, setResult] = useState<FlightResult>('none')
   const [snap, setSnap] = useState<HudSnapshot | null>(null)
   const [cameraMode, setCameraMode] = useState<CameraMode>('chase')
-  const [muted, setMuted] = useState(false)
   const [flightTime, setFlightTime] = useState(0)
   const [maxAlt, setMaxAlt] = useState(0)
+  const [landingVSpeed, setLandingVSpeed] = useState(0)
+  const [landingSpeed, setLandingSpeed] = useState(0)
+
+  const [settings, setSettings] = useState<Settings>({
+    sensitivity: 1.0,
+    volume: 0.9,
+    muted: false,
+  })
+
+  // apply settings to engine whenever they change
+  useEffect(() => {
+    const e = engineRef.current
+    if (!e) return
+    e.setSensitivity(settings.sensitivity)
+    e.setVolume(settings.muted ? 0 : settings.volume)
+    e.setMuted(settings.muted)
+  }, [settings])
 
   useEffect(() => {
     const container = containerRef.current
@@ -25,12 +47,15 @@ export function FlightSimulator() {
     const engine = new FlightEngine(container)
     engineRef.current = engine
 
+    // apply initial settings
+    engine.setSensitivity(settings.sensitivity)
+    engine.setVolume(settings.muted ? 0 : settings.volume)
+    engine.setMuted(settings.muted)
+
     engine.onState = (s) => {
-      // track max altitude while flying
       if (engine.phase === 'flying') {
         maxAltRef.current = Math.max(maxAltRef.current, s.state.altitude)
       }
-      // throttle React HUD updates to ~30fps for smoothness without overhead
       const now = performance.now()
       if (now - lastHudUpdate.current > 33) {
         lastHudUpdate.current = now
@@ -43,6 +68,8 @@ export function FlightSimulator() {
       if (p === 'ended') {
         setFlightTime(engine.state.flightTime)
         setMaxAlt(maxAltRef.current)
+        setLandingVSpeed(engine.state.landingVerticalSpeed)
+        setLandingSpeed(engine.state.landingSpeed)
       }
       if (p === 'flying' && r === 'flying') {
         maxAltRef.current = engine.state.altitude
@@ -72,33 +99,29 @@ export function FlightSimulator() {
     engineRef.current?.reset()
   }
   const handleQuit = () => engineRef.current?.quitToMenu()
-  const handleToggleMute = () => {
-    setMuted((m) => {
-      const nm = !m
-      engineRef.current?.setMuted(nm)
-      return nm
-    })
-  }
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-sky-300">
       <div ref={containerRef} className="absolute inset-0" />
 
-      {/* HUD only while flying or paused */}
       {(phase === 'flying' || phase === 'paused') && snap && (
         <Hud snap={snap} cameraMode={cameraMode} />
       )}
 
       {phase === 'menu' && (
-        <MainMenu onStart={handleStart} muted={muted} onToggleMute={handleToggleMute} />
+        <MainMenu
+          onStart={handleStart}
+          settings={settings}
+          onSettingsChange={setSettings}
+        />
       )}
       {phase === 'paused' && (
         <PauseMenu
           onResume={handleResume}
           onRestart={handleRestart}
           onQuit={handleQuit}
-          muted={muted}
-          onToggleMute={handleToggleMute}
+          settings={settings}
+          onSettingsChange={setSettings}
         />
       )}
       {phase === 'ended' && (
@@ -106,6 +129,8 @@ export function FlightSimulator() {
           result={result}
           flightTime={flightTime}
           maxAlt={maxAlt}
+          landingVSpeed={landingVSpeed}
+          landingSpeed={landingSpeed}
           onRestart={handleRestart}
           onQuit={handleQuit}
         />

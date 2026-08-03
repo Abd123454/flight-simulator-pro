@@ -70,6 +70,9 @@ export class Environment {
 
     // distant ground haze ring (a big dark-green disc below fog) handled by fog color
 
+    // --- Clouds (simple billboard puffs — cheap, no particles) ---
+    this.buildClouds()
+
     // --- Environment + fog ---
     scene.background = new THREE.Color(0xbfe3ff)
     scene.fog = new THREE.Fog(0xcfe8f5, 2500, 9000)
@@ -81,6 +84,42 @@ export class Environment {
   followTarget(pos: THREE.Vector3) {
     this.sun.target.position.copy(pos)
     this.sun.position.set(pos.x + 600, pos.y + 1200, pos.z - 400)
+  }
+
+  private buildClouds() {
+    // Simple flat billboard clouds: a few flattened spheres grouped into puffs.
+    // They don't cast shadows (cheap) and sit at high altitude.
+    const cloudMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.85,
+      roughness: 1,
+      metalness: 0,
+    })
+    for (let i = 0; i < 18; i++) {
+      const cloud = new THREE.Group()
+      const puffCount = 3 + Math.floor(Math.random() * 4)
+      for (let p = 0; p < puffCount; p++) {
+        const r = 40 + Math.random() * 50
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(r, 6, 5), cloudMat)
+        puff.position.set(
+          (Math.random() - 0.5) * 120,
+          (Math.random() - 0.5) * 15,
+          (Math.random() - 0.5) * 120
+        )
+        puff.scale.y = 0.4 // flatten
+        cloud.add(puff)
+      }
+      // scatter around the airport area at 600-900m altitude
+      const angle = Math.random() * Math.PI * 2
+      const dist = 800 + Math.random() * 4000
+      cloud.position.set(
+        Math.cos(angle) * dist,
+        600 + Math.random() * 300,
+        Math.sin(angle) * dist
+      )
+      this.group.add(cloud)
+    }
   }
 
   dispose() {

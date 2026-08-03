@@ -7,10 +7,17 @@ import type { FlightControls, FlightState } from './types'
 export const PHYS = {
   mass: 65000, // kg (half-loaded)
   wingArea: 124.6, // m^2
-  maxThrust: 1_000_000, // N (arcade-boosted for snappy acceleration)
+  maxThrust: 1_200_000, // N (arcade-boosted for snappy acceleration)
+  reverseThrust: 400_000, // N (reverse thrust for braking after landing)
   cl0: 0.25,
   clAlpha: 0.11, // per degree
   clMax: 1.6,
+  // flaps: multiply CL and add drag
+  flapsClBoost: 0.4, // extra CL per flap stage
+  flapsCdBoost: 0.015, // extra CD per flap stage
+  flapsMaxStages: 3, // 0..3
+  // spoilers/airbrake
+  spoilerCdBoost: 0.06, // extra CD when spoilers deployed
   cd0: 0.022,
   inducedK: 0.045,
   stallAoA: 15, // degrees
@@ -22,9 +29,9 @@ export const PHYS = {
   // ground
   groundY: 3.2, // airplane center height when on gear
   gearHeight: 3.2,
-  rollingFriction: 0.05, // per-second fractional decay (gentle coast)
-  brakeFriction: 0.9, // per-second decay when braking
-  grassFriction: 0.7,
+  rollingFriction: 0.04, // per-second fractional decay (gentle coast)
+  brakeFriction: 1.4, // per-second decay when braking
+  grassFriction: 0.8,
   groundSteerRate: 0.7, // rad/s yaw steering on ground
   groundLevelRate: 4.0, // how fast orientation levels on ground
   // runway bounds (centered on origin, along Z)
@@ -35,7 +42,10 @@ export const PHYS = {
   autoLevelPitch: 0.6, // mild pitch return
   coordinatedTurn: 0.8, // yaw toward bank for coordinated turns
   rpmSlew: 0.9, // engine spool rate
-  maxSpeed: 280, // m/s soft cap
+  maxSpeed: 290, // m/s soft cap
+  // crash thresholds
+  crashVerticalSpeed: 5.0, // m/s — hard landing
+  crashBankAngle: 50, // degrees — excessive bank on ground
 } as const
 
 // Reusable temporaries (avoid per-frame allocations).
@@ -57,7 +67,6 @@ const _tmpQ = new THREE.Quaternion()
 const _inv = new THREE.Quaternion()
 
 const DEG = 180 / Math.PI
-const RAD = Math.PI / 180
 
 /**
  * Advance the flight model by dt seconds.
@@ -70,7 +79,7 @@ export function stepFlight(
   dt: number
 ): void {
   if (state.crashed) {
-    // crashed: just decay velocity & let it sit
+    // crashed: decay velocity & let it sit
     state.velocity.x *= 0.9
     state.velocity.z *= 0.9
     state.velocity.y = 0
@@ -94,11 +103,17 @@ export function stepFlight(
   // --- Air density (exponential atmosphere) ---
   const rho = 1.225 * Math.exp(-state.altitude / 10000)
 
+  // --- Flaps & spoilers effect on coefficients ---
+  const flapsStage = state.flaps // 0..3
+  const clFlaps = flapsStage * PHYS.flapsClBoost
+  const cdFlaps = flapsStage * PHYS.flapsCdBoost
+  const cdSpoiler = state.spoilers ? PHYS.spoilerCdBoost : 0
+
   // --- Lift / drag coefficients ---
   let cl: number
   let stalled = false
   if (aoaAbs < PHYS.stallAoA) {
-    cl = PHYS.cl0 + PHYS.clAlpha * aoaDeg
+    cl = PHYS.cl0 + PHYS.clAlpha * aoaDeg + clFlaps
     cl = THREE.MathUtils.clamp(cl, -PHYS.clMax, PHYS.clMax)
   } else {
     // post-stall: lift drops sharply
@@ -107,7 +122,7 @@ export function stepFlight(
     const clPeak = PHYS.cl0 + PHYS.clAlpha * PHYS.stallAoA
     cl = Math.sign(aoaDeg) * clPeak * drop
   }
-  const cd = PHYS.cd0 + PHYS.inducedK * cl * cl
+  const cd = PHYS.cd0 + PHYS.inducedK * cl * cl + cdFlaps + cdSpoiler
 
   const q = 0.5 * rho * speed * speed // dynamic pressure
   const liftMag = q * PHYS.wingArea * cl
@@ -115,11 +130,20 @@ export function stepFlight(
 
   // --- Forces (world space) ---
   _lift.copy(_up).multiplyScalar(liftMag)
-  _vDir.copy(state.velocity)
+  _vDir.copy(state.velocity as unknown as THREE.Vector3)
   if (_vDir.lengthSq() < 1e-4) _vDir.set(0, 0, -1)
   _vDir.normalize()
   _drag.copy(_vDir).multiplyScalar(-dragMag)
-  _thrust.copy(_forward).multiplyScalar(state.throttle * PHYS.maxThrust)
+
+  // --- Thrust (forward or reverse) ---
+  let thrustMag: number
+  if (state.reverseThrust && state.onGround) {
+    // reverse thrust opposes forward motion
+    thrustMag = -state.throttle * PHYS.reverseThrust
+  } else {
+    thrustMag = state.throttle * PHYS.maxThrust
+  }
+  _thrust.copy(_forward).multiplyScalar(thrustMag)
   _grav.set(0, -PHYS.g * PHYS.mass, 0)
 
   _force.set(0, 0, 0)
@@ -160,15 +184,9 @@ export function stepFlight(
   // coordinated turn: yaw toward bank so nose follows the turn
   yawRate += Math.sin(state.roll) * PHYS.coordinatedTurn * aeroAuth
 
-  // Build local-space delta quaternion.
-  // Local axes: pitch around +X (nose up), roll around forward (-Z), yaw around +Y.
-  // nose up = +rotation about local X (verified)
-  // roll right (right wing down) = +rotation about forward axis (-Z)
-  // nose right = -rotation about +Y  => axis (0,1,0), negative angle
-  _euler.set(pitchRate * dt, -yawRate * dt, -rollRate * dt, 'ZYX')
-  // We compose manually with explicit axes to keep conventions stable:
+  // Build local-space delta quaternion via explicit axes.
   _deltaQ.identity()
-  // pitch
+  // pitch (nose up = +rotation about local X)
   _axis.set(1, 0, 0)
   _tmpQ.setFromAxisAngle(_axis, pitchRate * dt)
   _deltaQ.multiply(_tmpQ)
@@ -191,9 +209,23 @@ export function stepFlight(
   if (state.position.y <= PHYS.groundY) {
     state.onGround = true
     // touchdown detection
-    if (wasAirborne && state.velocity.y < -5.0) {
-      // hard impact
-      state.crashed = true
+    if (wasAirborne) {
+      const bankDeg = Math.abs(state.roll * DEG)
+      const vspeed = state.velocity.y
+      // crash on: hard vertical impact, or excessive bank, or off-runway at speed
+      if (vspeed < -PHYS.crashVerticalSpeed) {
+        state.crashed = true
+        state.crashReason = 'hard landing'
+      } else if (bankDeg > PHYS.crashBankAngle && speed > 20) {
+        state.crashed = true
+        state.crashReason = 'wing strike'
+      }
+      // record landing metrics for scoring
+      if (!state.crashed) {
+        state.landingVerticalSpeed = vspeed
+        state.landingSpeed = speed
+        state.landedSmoothly = vspeed > -2.0
+      }
     }
     // rest on the gear; kill only downward velocity (let future lift raise it)
     state.position.y = PHYS.groundY
@@ -241,12 +273,10 @@ export function stepFlight(
   }
 
   // --- Derive display fields ---
-  // recompute basis from final orientation
   _forward.set(0, 0, -1).applyQuaternion(orientation)
   _up.set(0, 1, 0).applyQuaternion(orientation)
   _right.set(1, 0, 0).applyQuaternion(orientation)
 
-  // euler for HUD (YXZ order: yaw, pitch, roll)
   _euler.setFromQuaternion(orientation, 'YXZ')
   state.yaw = _euler.y
   state.pitch = _euler.x
@@ -255,7 +285,6 @@ export function stepFlight(
   state.airspeed = Math.max(0, forwardSpeed)
   state.groundSpeed = Math.hypot(state.velocity.x, state.velocity.z)
   state.altitude = state.position.y
-  // heading 0..360, 0 = north (-Z)
   let h = Math.atan2(_forward.x, -_forward.z) * DEG
   if (h < 0) h += 360
   state.heading = h
@@ -276,7 +305,10 @@ export function stepFlight(
   // crash if flew into terrain at high speed off-runway (safety)
   if (state.position.y < 0) {
     state.position.y = 0
-    if (speed > 40) state.crashed = true
+    if (speed > 40) {
+      state.crashed = true
+      state.crashReason = 'terrain collision'
+    }
   }
 }
 
@@ -305,5 +337,12 @@ export function createInitialState(): FlightState {
     controlPitch: 0,
     controlRoll: 0,
     controlYaw: 0,
+    flaps: 0,
+    spoilers: false,
+    reverseThrust: false,
+    crashReason: '',
+    landingVerticalSpeed: 0,
+    landingSpeed: 0,
+    landedSmoothly: false,
   }
 }

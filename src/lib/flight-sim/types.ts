@@ -44,6 +44,17 @@ export interface FlightState {
   controlPitch: number
   controlRoll: number
   controlYaw: number
+
+  // high-lift / drag devices
+  flaps: number // 0..3 stages
+  spoilers: boolean // airbrake deployed
+  reverseThrust: boolean // reverse thrust engaged (ground only)
+
+  // crash & landing metrics
+  crashReason: string
+  landingVerticalSpeed: number // m/s at touchdown
+  landingSpeed: number // m/s at touchdown
+  landedSmoothly: boolean
 }
 
 export type CameraMode = 'chase' | 'cockpit' | 'tower'

@@ -20,6 +20,9 @@ export class Airplane {
   private gearGroups: THREE.Group[] = []
   private gearRetract = 0 // 0 = down, 1 = up
   private fanAngle = 0
+  private smokeGroup: THREE.Group | null = null
+  private smokeTimer = 0
+  private smokePuffs: { mesh: THREE.Mesh; vel: THREE.Vector3; life: number }[] = []
 
   constructor() {
     this.group = new THREE.Group()
@@ -176,5 +179,68 @@ export class Airplane {
       g.scale.y = 1 - this.gearRetract * 0.9
       g.visible = this.gearRetract < 0.98
     }
+
+    // update crash smoke puffs
+    if (this.smokeGroup) {
+      this.smokeTimer += dt
+      // spawn new puffs while crashed
+      if (state.crashed && this.smokeTimer > 0.15 && this.smokePuffs.length < 40) {
+        this.smokeTimer = 0
+        this.spawnSmoke()
+      }
+      // animate existing puffs
+      for (let i = this.smokePuffs.length - 1; i >= 0; i--) {
+        const p = this.smokePuffs[i]
+        p.mesh.position.x += p.vel.x * dt
+        p.mesh.position.y += p.vel.y * dt
+        p.mesh.position.z += p.vel.z * dt
+        p.life -= dt
+        const scale = 1 + (1 - p.life / 2.5) * 2
+        p.mesh.scale.setScalar(scale)
+        const mat = p.mesh.material as THREE.MeshStandardMaterial
+        mat.opacity = Math.max(0, p.life / 2.5) * 0.6
+        if (p.life <= 0) {
+          this.smokeGroup.remove(p.mesh)
+          p.mesh.geometry.dispose()
+          ;(p.mesh.material as THREE.Material).dispose()
+          this.smokePuffs.splice(i, 1)
+        }
+      }
+    }
+  }
+
+  private spawnSmoke() {
+    if (!this.smokeGroup) return
+    const geo = new THREE.SphereGeometry(1.5, 6, 6)
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x333333,
+      transparent: true,
+      opacity: 0.6,
+      roughness: 1,
+    })
+    const mesh = new THREE.Mesh(geo, mat)
+    // spawn near the fuselage (world-relative to airplane group origin)
+    mesh.position.set(
+      (Math.random() - 0.5) * 6,
+      Math.random() * 3,
+      (Math.random() - 0.5) * 10
+    )
+    this.smokeGroup.add(mesh)
+    this.smokePuffs.push({
+      mesh,
+      vel: new THREE.Vector3(
+        (Math.random() - 0.5) * 3,
+        2 + Math.random() * 3,
+        (Math.random() - 0.5) * 3
+      ),
+      life: 2.5,
+    })
+  }
+
+  /** Trigger crash smoke effect. */
+  crash() {
+    if (this.smokeGroup) return
+    this.smokeGroup = new THREE.Group()
+    this.group.add(this.smokeGroup)
   }
 }

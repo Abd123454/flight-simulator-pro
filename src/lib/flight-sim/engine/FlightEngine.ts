@@ -163,6 +163,25 @@ export class FlightEngine {
         this.state.gearDown = !this.state.gearDown
         this.audio.gearSound()
       }
+      // flaps (F = extend, V = retract), 0..3 stages
+      if (this.input.consumeFlapsDown()) {
+        this.state.flaps = Math.min(3, this.state.flaps + 1)
+        this.audio.gearSound()
+      }
+      if (this.input.consumeFlapsUp()) {
+        this.state.flaps = Math.max(0, this.state.flaps - 1)
+        this.audio.gearSound()
+      }
+      // spoilers / airbrake (B)
+      if (this.input.consumeSpoilerToggle()) {
+        this.state.spoilers = !this.state.spoilers
+      }
+      // reverse thrust (X) — only effective on ground
+      if (this.input.consumeReverseToggle()) {
+        this.state.reverseThrust = !this.state.reverseThrust
+      }
+      // auto-disengage reverse when airborne
+      if (!this.state.onGround) this.state.reverseThrust = false
 
       // fixed-timestep physics — carry over accumulated time (cap to avoid
       // spiral of death), so the sim stays real-time even at low FPS.
@@ -170,6 +189,7 @@ export class FlightEngine {
       this.accumulator += dt
       if (this.accumulator > 0.5) this.accumulator = 0.5
       let steps = 0
+      const wasCrashed = this.state.crashed
       while (this.accumulator >= STEP && steps < 30) {
         try {
           stepFlight(this.state, this.orientation, controls, STEP)
@@ -186,6 +206,11 @@ export class FlightEngine {
       this.applyStateToMesh()
       this.airplane.update(this.state, dt)
       this.airport.update(dt)
+
+      // trigger crash smoke effect on new crash
+      if (!wasCrashed && this.state.crashed) {
+        this.airplane.crash()
+      }
 
       // touchdown audio
       this.touchdownCooldown -= dt
@@ -274,6 +299,14 @@ export class FlightEngine {
   setMuted(m: boolean) {
     this.muted = m
     this.audio.setMuted(m)
+  }
+
+  setSensitivity(s: number) {
+    this.input.sensitivity = s
+  }
+
+  setVolume(v: number) {
+    this.audio.setVolume(v)
   }
 
   resize() {

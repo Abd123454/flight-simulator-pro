@@ -154,6 +154,12 @@ export class AudioEngine {
     this.muted = m
   }
 
+  setVolume(v: number) {
+    if (this.master && this.ctx) {
+      this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.1)
+    }
+  }
+
   suspend() {
     this.ctx?.suspend()
   }
