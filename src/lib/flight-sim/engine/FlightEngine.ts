@@ -48,6 +48,7 @@ export interface HudSnapshot {
   autopilotAltitude: number
   weatherCondition: string
   gustActive: boolean
+  liveWeatherSource: string
 }
 
 export type FlightResult = 'none' | 'flying' | 'success' | 'crash'
@@ -80,6 +81,7 @@ export class FlightEngine {
   missionStartTime = 0
   missionElapsed = 0
 
+  liveWeatherSource = ''
   // autopilot
   autopilot = false
   autopilotHeading = 0 // degrees, target heading
@@ -515,6 +517,7 @@ export class FlightEngine {
         autopilotAltitude: this.autopilotAltitude,
         weatherCondition: this.weather.weather.condition,
         gustActive: this.weather.isGustActive(),
+        liveWeatherSource: this.liveWeatherSource,
       })
     }
   }
@@ -650,6 +653,13 @@ export class FlightEngine {
 
   setVolume(v: number) {
     this.audio.setVolume(v)
+  }
+
+  /** Apply fetched live weather to the WeatherSystem. Called after
+   * fetchLiveWeather() resolves, before/at mission start. */
+  applyLiveWeather(windSpeed: number, windDir: number, visibility: number, source = 'live') {
+    this.weather.setLiveWeather(windSpeed, windDir, visibility)
+    this.liveWeatherSource = source
   }
 
   resize() {

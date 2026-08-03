@@ -63,6 +63,28 @@ export class WeatherSystem {
     }
   }
 
+  /** Set wind + visibility directly from fetched live data (Open-Meteo).
+   * Overrides the procedural base wind. Condition stays as-is unless the
+   * caller sets it. Used by the "live weather" feature. */
+  setLiveWeather(windSpeed: number, windDir: number, visibility: number) {
+    this.baseSpeed = windSpeed
+    this.baseDir = windDir
+    // clamp visibility into a sensible range for the sim
+    this.weather.visibility = Math.max(500, Math.min(visibility, 12000))
+    // pick a condition based on visibility (rough mapping)
+    if (visibility < 2000) {
+      this.setCondition('storm')
+    } else if (visibility < 4000) {
+      this.setCondition('rain')
+    } else if (visibility < 6000) {
+      this.setCondition('cloudy')
+    } else {
+      this.setCondition('clear')
+    }
+    // re-apply the real visibility (setCondition overwrites it)
+    this.weather.visibility = Math.max(500, Math.min(visibility, 12000))
+  }
+
   update(dt: number) {
     this.t += dt
     // wind speed varies ±30% around base, slowly

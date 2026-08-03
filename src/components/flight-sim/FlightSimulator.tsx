@@ -5,6 +5,7 @@ import type { CameraMode, GamePhase } from '@/lib/flight-sim/types'
 import { AIRCRAFT, type AircraftType } from '@/lib/flight-sim/aircraft-config'
 import { MISSIONS, createMissionState } from '@/lib/flight-sim/missions'
 import { loadProgress, recordMissionResult, type PlayerProgress, type Achievement } from '@/lib/flight-sim/achievements'
+import type { LiveWeatherData } from '@/lib/flight-sim/live-weather'
 import { Hud } from './Hud'
 import { MainMenu, PauseMenu, EndScreen } from './Menus'
 import { AircraftSelect } from './AircraftSelect'
@@ -24,6 +25,7 @@ export function FlightSimulator() {
   const maxAltRef = useRef(0)
   const lastHudUpdate = useRef(0)
   const lastWeatherRef = useRef('clear')
+  const liveWeatherRef = useRef<LiveWeatherData | null | undefined>(null)
 
   const [screen, setScreen] = useState<Screen>('menu')
   const [phase, setPhase] = useState<GamePhase>('menu')
@@ -113,6 +115,14 @@ export function FlightSimulator() {
 
     engine.boot()
     engine.startFlight()
+    // apply live weather if the player fetched real conditions
+    if (liveWeatherRef.current) {
+      engine.applyLiveWeather(
+        liveWeatherRef.current.windSpeed,
+        liveWeatherRef.current.windDirection,
+        liveWeatherRef.current.visibility
+      )
+    }
 
     const onResize = () => engine.resize()
     window.addEventListener('resize', onResize)
@@ -129,9 +139,10 @@ export function FlightSimulator() {
     setSelectedMissionKey('freeflight')
     setScreen('game')
   }
-  const handleAircraftSelect = (ac: AircraftType, missionKey: string) => {
+  const handleAircraftSelect = (ac: AircraftType, missionKey: string, liveWeather?: LiveWeatherData) => {
     setSelectedAircraft(ac)
     setSelectedMissionKey(missionKey)
+    liveWeatherRef.current = liveWeather
     setScreen('game')
   }
   const handleResume = () => engineRef.current?.resume()

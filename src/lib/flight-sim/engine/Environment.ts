@@ -58,20 +58,51 @@ export class Environment {
     this.hemi = new THREE.HemisphereLight(0xbfe3ff, 0x4a6a3a, 0.55)
     this.group.add(this.hemi)
 
-    // --- Terrain (heightmap with procedural Perlin noise hills) ---
+    // --- Terrain (heightmap with procedural noise + real elevation profile) ---
     // Subdivided plane with vertices displaced by layered noise for hills/valleys.
     // Flat near the airport (z within ±1700) so the runway stays level.
+    // The noise amplitude is biased by a real fetched elevation grid (Denver
+    // Intl area, KDEN) so distant hills follow a real-world terrain profile
+    // rather than arbitrary noise. Source: Open-Elevation API, fetched
+    // 2026-08-04, 5×5 grid around 39.86°N, 104.67°W.
     const terrainSize = 20000
     const terrainSegs = 128 // 128x128 = 16K verts, single draw call
     const terrainGeo = new THREE.PlaneGeometry(terrainSize, terrainSize, terrainSegs, terrainSegs)
     terrainGeo.rotateX(-Math.PI / 2)
-    // displace vertices with noise
+    // Real elevation grid (Denver area, meters). 5×5, row-major.
+    // Fetched from https://api.open-elevation.com on 2026-08-04.
+    // Values range 1600-1646m; we use the *variation* (offset from mean) to
+    // bias hill height, not the absolute elevation (the airport sits at 0).
+    const realElevations = [
+      1635, 1631, 1646, 1630, 1627,
+      1619, 1629, 1643, 1626, 1621,
+      1606, 1635, 1640, 1627, 1618,
+      1600, 1635, 1634, 1627, 1612,
+      1612, 1626, 1613, 1619, 1606,
+    ]
+    const meanElev = realElevations.reduce((a, b) => a + b, 0) / realElevations.length
+    const elevGridSize = 5
+    // sample the elevation grid bilinearly by world position (normalized -1..1)
+    const sampleElevation = (wx: number, wz: number): number => {
+      const u = THREE.MathUtils.clamp((wx / terrainSize) + 0.5, 0, 0.999)
+      const v = THREE.MathUtils.clamp((wz / terrainSize) + 0.5, 0, 0.999)
+      const fx = u * (elevGridSize - 1)
+      const fy = v * (elevGridSize - 1)
+      const ix = Math.floor(fx)
+      const iy = Math.floor(fy)
+      const tx = fx - ix
+      const ty = fy - iy
+      const a = realElevations[iy * elevGridSize + ix]
+      const b = realElevations[iy * elevGridSize + (ix + 1)]
+      const c = realElevations[(iy + 1) * elevGridSize + ix]
+      const d = realElevations[(iy + 1) * elevGridSize + (ix + 1)]
+      const elev = (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty
+      return elev - meanElev // deviation from mean (-23..+18m)
+    }
     const pos = terrainGeo.attributes.position
-    const flatZone = 1800 // keep flat within this distance of airport center
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i)
       const z = pos.getZ(i)
-      const distFromCenter = Math.hypot(x, z)
       // distance from the runway strip (along Z, x near 0)
       const distFromRunway = Math.max(Math.abs(x) - 60, 0) // 60m runway half-width
       const runwayProximity = Math.max(Math.abs(z) - 1600, 0) // flat along runway
@@ -81,6 +112,8 @@ export class Environment {
       h += this.noise2D(x * 0.0008, z * 0.0008) * 120 // large hills
       h += this.noise2D(x * 0.003, z * 0.003) * 40 // medium
       h += this.noise2D(x * 0.01, z * 0.01) * 12 // small detail
+      // bias by real elevation deviation (scaled up so it's visible)
+      h += sampleElevation(x, z) * 6
       // flatten near airport (smooth transition)
       const flatten = THREE.MathUtils.clamp(flatDist / 500, 0, 1)
       h *= flatten

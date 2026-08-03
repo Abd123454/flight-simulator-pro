@@ -132,6 +132,7 @@ export function Hud({ snap, cameraMode }: Props) {
              snap.weatherCondition === 'cloudy' ? '☁' :
              snap.weatherCondition === 'rain' ? '🌧' : '⛈'}
             {' '}{snap.weatherCondition.toUpperCase()}
+            {snap.liveWeatherSource && <span className="text-emerald-400"> · LIVE</span>}
             {snap.gustActive && <span className="text-orange-400 animate-pulse"> GUST!</span>}
           </span>
           {/* Autopilot indicator */}

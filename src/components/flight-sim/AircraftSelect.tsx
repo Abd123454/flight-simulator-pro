@@ -3,9 +3,10 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { AIRCRAFT_LIST, type AircraftType } from '@/lib/flight-sim/aircraft-config'
 import { MISSIONS, CAMPAIGN, type MissionConfig } from '@/lib/flight-sim/missions'
+import { LIVE_AIRPORTS, fetchLiveWeather, type LiveWeatherData } from '@/lib/flight-sim/live-weather'
 
 interface Props {
-  onSelect: (aircraft: AircraftType, missionKey: string) => void
+  onSelect: (aircraft: AircraftType, missionKey: string, liveWeather?: LiveWeatherData) => void
   onBack: () => void
   completedMissions: string[]
 }
@@ -45,10 +46,30 @@ const MISSION_ICONS: Record<string, string> = {
 export function AircraftSelect({ onSelect, onBack, completedMissions }: Props) {
   const [selectedAircraft, setSelectedAircraft] = useState<AircraftType>('airliner')
   const [selectedMissionKey, setSelectedMissionKey] = useState<string>('freeflight')
+  const [liveAirportIcao, setLiveAirportIcao] = useState<string>('')
+  const [liveWeather, setLiveWeather] = useState<LiveWeatherData | null>(null)
+  const [liveStatus, setLiveStatus] = useState<string>('')
 
   const aircraft = AIRCRAFT_LIST.find((a) => a.type === selectedAircraft)!
   const mission = MISSIONS[selectedMissionKey]
   const completedSet = new Set(completedMissions)
+
+  async function handleFetchLiveWeather(icao: string) {
+    setLiveStatus('Fetching...')
+    const airport = LIVE_AIRPORTS.find((a) => a.icao === icao)
+    if (!airport) {
+      setLiveStatus('Unknown airport')
+      return
+    }
+    const data = await fetchLiveWeather(airport)
+    if (data) {
+      setLiveWeather(data)
+      setLiveStatus(`✓ ${airport.icao}: ${Math.round(data.windDirection)}° @ ${(data.windSpeed * 3.6).toFixed(1)} km/h, vis ${(data.visibility / 1000).toFixed(1)}km`)
+    } else {
+      setLiveWeather(null)
+      setLiveStatus(`✗ Failed to fetch ${airport.icao} (offline or rate-limited) — will use procedural weather`)
+    }
+  }
 
   return (
     <div className="absolute inset-0 z-20 flex flex-col overflow-y-auto bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-6">
@@ -152,11 +173,50 @@ export function AircraftSelect({ onSelect, onBack, completedMissions }: Props) {
         </div>
       </div>
 
+      {/* Live weather (optional, Open-Meteo — free, no API key) */}
+      <div className="mb-6">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-white/70">
+          Live Weather (optional)
+        </h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-white/50">Fetch real conditions:</span>
+          {LIVE_AIRPORTS.map((a) => (
+            <button
+              key={a.icao}
+              onClick={() => {
+                setLiveAirportIcao(a.icao)
+                handleFetchLiveWeather(a.icao)
+              }}
+              className={`rounded border px-2 py-1 text-[10px] font-mono transition-all ${
+                liveAirportIcao === a.icao
+                  ? 'border-emerald-400 bg-emerald-950/30 text-emerald-200'
+                  : 'border-white/15 bg-black/30 text-white/60 hover:border-white/30'
+              }`}
+            >
+              {a.icao}
+            </button>
+          ))}
+          <button
+            onClick={() => {
+              setLiveAirportIcao('')
+              setLiveWeather(null)
+              setLiveStatus('(procedural weather)')
+            }}
+            className="rounded border border-white/15 px-2 py-1 text-[10px] font-mono text-white/50 hover:border-white/30"
+          >
+            off
+          </button>
+        </div>
+        <div className="mt-2 min-h-[20px] text-xs text-white/60">
+          {liveStatus || '(procedural weather — pick an airport to fetch live data)'}
+        </div>
+      </div>
+
       {/* Launch */}
       <div className="flex justify-center">
         <Button
           size="lg"
-          onClick={() => onSelect(selectedAircraft, selectedMissionKey)}
+          onClick={() => onSelect(selectedAircraft, selectedMissionKey, liveWeather ?? undefined)}
           className="w-64 bg-cyan-500 text-lg font-bold text-slate-950 hover:bg-cyan-400"
         >
           Launch Mission →
