@@ -188,7 +188,7 @@ export class Environment {
 
   /** Animate rain droplets (call each frame). */
   updateRain(dt: number, windX: number, windZ: number) {
-    if (!this.rainPoints || !this.rainPoints.visible) return
+    if (!this.rainPoints || !this.rainPoints.visible || !this.rainVelocities) return
     const pos = this.rainPoints.geometry.attributes.position as THREE.BufferAttribute
     const arr = pos.array as Float32Array
     const windOffsetX = windX * dt * 0.3

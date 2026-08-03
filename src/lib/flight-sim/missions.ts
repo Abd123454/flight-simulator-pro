@@ -107,8 +107,8 @@ export const MISSIONS: Record<string, MissionConfig> = {
   crosscountry: {
     type: 'crosscountry',
     name: 'Cross Country',
-    description: 'Navigate 5km north to the second airport and land.',
-    brief: 'Fly north through the navigation waypoints to reach Northfield Airport, then land safely. Watch your fuel — manage throttle for the journey!',
+    description: 'Navigate 5km north to Northfield Airport and land there.',
+    brief: 'Fly north through the navigation waypoints to reach Northfield Airport, then land on its runway. The mission completes when you touch down and slow below 30 km/h on the Northfield runway.',
     waypoints: [
       { id: 1, position: { x: 0, y: 500, z: 0 }, reached: false, radius: 100 },
       { id: 2, position: { x: 0, y: 600, z: -1500 }, reached: false, radius: 100 },
@@ -126,8 +126,8 @@ export const MISSIONS: Record<string, MissionConfig> = {
   storm: {
     type: 'storm',
     name: 'Storm Runner',
-    description: 'Fly through a severe storm to reach the emergency landing site.',
-    brief: 'A severe storm has hit the region. Visibility is dangerously low and gusts are strong. Navigate through the waypoints and land safely. Only for experienced pilots!',
+    description: 'Fly through a severe storm, reach the landing site, and land.',
+    brief: 'A severe storm has hit the region. Visibility is dangerously low and gusts are strong. Navigate through the waypoints and land on the main runway. The mission completes on touchdown below 30 km/h. Only for experienced pilots!',
     waypoints: [
       { id: 1, position: { x: 0, y: 300, z: 800 }, reached: false, radius: 80 },
       { id: 2, position: { x: -200, y: 350, z: 0 }, reached: false, radius: 80 },

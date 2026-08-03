@@ -334,10 +334,16 @@ export function stepFlight(
 
     _forward.set(0, 0, -1).applyQuaternion(orientation)
 
-    // Friction (very low rolling resistance on runway)
-    const onRunway =
+    // Friction: check if on ANY runway (main airport + Northfield)
+    const onMainRunway =
       Math.abs(state.position.x) < PHYS.runwayHalfWidth + 5 &&
       Math.abs(state.position.z) < PHYS.runwayHalfLength
+    // Northfield airport: runway at z=-5500, half-width ~23, half-length ~1000
+    const northfieldZ = -5500
+    const onNorthfield =
+      Math.abs(state.position.x) < 28 &&
+      Math.abs(state.position.z - northfieldZ) < 1000
+    const onRunway = onMainRunway || onNorthfield
     const fric = controls.brake
       ? PHYS.brakeFriction
       : onRunway

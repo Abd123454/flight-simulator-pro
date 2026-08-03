@@ -33,6 +33,8 @@ function instancedSpheres(
 export class Airport {
   group: THREE.Group
   windsock: THREE.Group
+  /** Reference to the Northfield airport sub-group (for LOD culling). */
+  northfieldGroup: THREE.Group | null = null
   private windsockPhase = 0
 
   constructor() {
@@ -125,7 +127,12 @@ export class Airport {
   private buildNorthfield() {
     const offsetX = 0
     const offsetZ = -5500
-    // runway (shorter, 2000m)
+    // wrap everything in a sub-group for LOD culling
+    const nf = new THREE.Group()
+    nf.position.set(offsetX, 0, offsetZ)
+    this.northfieldGroup = nf
+    this.group.add(nf)
+    // runway (shorter, 2000m) — positions are relative to the nf group
     const runwayTex = makeRunwayTexture()
     const rwyGeo = new THREE.PlaneGeometry(45, 2000)
     rwyGeo.rotateX(-Math.PI / 2)
@@ -133,45 +140,45 @@ export class Airport {
       rwyGeo,
       new THREE.MeshStandardMaterial({ map: runwayTex, roughness: 0.95 })
     )
-    rwy.position.set(offsetX, 0.02, offsetZ)
+    rwy.position.set(0, 0.02, 0)
     rwy.receiveShadow = true
-    this.group.add(rwy)
+    nf.add(rwy)
     // small terminal
     const term = new THREE.Mesh(
       new THREE.BoxGeometry(30, 12, 80),
       new THREE.MeshStandardMaterial({ color: 0xc0c4c8, roughness: 0.7 })
     )
-    term.position.set(offsetX + 80, 6, offsetZ)
+    term.position.set(80, 6, 0)
     term.castShadow = true
-    this.group.add(term)
+    nf.add(term)
     // control tower (small)
     const shaft = new THREE.Mesh(
       new THREE.CylinderGeometry(2, 2.5, 20, 8),
       new THREE.MeshStandardMaterial({ color: 0xc8ccd0, roughness: 0.7 })
     )
-    shaft.position.set(offsetX - 60, 10, offsetZ + 200)
+    shaft.position.set(-60, 10, 200)
     shaft.castShadow = true
-    this.group.add(shaft)
+    nf.add(shaft)
     const cab = new THREE.Mesh(
       new THREE.CylinderGeometry(4, 3, 4, 8),
       new THREE.MeshStandardMaterial({ color: 0x1f2a33, roughness: 0.2, metalness: 0.5 })
     )
-    cab.position.set(offsetX - 60, 22, offsetZ + 200)
-    this.group.add(cab)
+    cab.position.set(-60, 22, 200)
+    nf.add(cab)
     // runway edge lights (instanced, simplified)
     const edgeLights: THREE.Vector3[] = []
     for (let z = -1000; z <= 1000; z += 100) {
-      edgeLights.push(new THREE.Vector3(offsetX - 23, 0.5, offsetZ + z))
-      edgeLights.push(new THREE.Vector3(offsetX + 23, 0.5, offsetZ + z))
+      edgeLights.push(new THREE.Vector3(-23, 0.5, z))
+      edgeLights.push(new THREE.Vector3(23, 0.5, z))
     }
-    this.group.add(instancedSpheres(edgeLights, 0xffffff, 0xffffcc, 0.4))
+    nf.add(instancedSpheres(edgeLights, 0xffffff, 0xffffcc, 0.4))
     // threshold lights (green)
     const thrLights: THREE.Vector3[] = []
     for (let i = -3; i <= 3; i++) {
-      thrLights.push(new THREE.Vector3(offsetX + i * 6, 0.5, offsetZ - 1000))
-      thrLights.push(new THREE.Vector3(offsetX + i * 6, 0.5, offsetZ + 1000))
+      thrLights.push(new THREE.Vector3(i * 6, 0.5, -1000))
+      thrLights.push(new THREE.Vector3(i * 6, 0.5, 1000))
     }
-    this.group.add(instancedSpheres(thrLights, 0x20ff40, 0x10aa20, 0.4))
+    nf.add(instancedSpheres(thrLights, 0x20ff40, 0x10aa20, 0.4))
   }
 
   private buildPAPI(x: number, y: number, z: number, dir: number) {

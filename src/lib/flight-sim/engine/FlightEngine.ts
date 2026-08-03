@@ -7,6 +7,7 @@ import { Airplane } from './Airplane'
 import { CameraController } from './CameraController'
 import { InputController } from './InputController'
 import { AudioEngine } from './AudioEngine'
+import { LODCuller } from './LODCuller'
 import { stepFlight, createInitialState, PHYS } from '../physics'
 import { WeatherSystem } from '../weather'
 import type { AircraftConfig } from '../aircraft-config'
@@ -87,6 +88,8 @@ export class FlightEngine {
   // waypoint/target visuals
   private waypointMeshes: { mesh: THREE.Group; wp: Waypoint }[] = []
   private targetMeshes: { mesh: THREE.Group; target: Target }[] = []
+  // LOD culler
+  private lod: LODCuller | null = null
 
   private container: HTMLElement
   private raf = 0
@@ -150,6 +153,12 @@ export class FlightEngine {
     this.audio = new AudioEngine()
     this.weather = new WeatherSystem()
     this.weather.setWind(5, 270)
+
+    // LOD culler: hide distant objects beyond their cull distance
+    this.lod = new LODCuller(this.cam.camera)
+    if (this.airport.northfieldGroup) {
+      this.lod.add(this.airport.northfieldGroup, 4000) // hide Northfield beyond 4km
+    }
 
     this.cam.camera.position.set(0, 20, 1500)
   }
@@ -452,6 +461,8 @@ export class FlightEngine {
 
     // camera follows even when paused/ended for a nice view
     this.cam.update(this.state, this.orientation, dt)
+    // LOD cull: hide distant objects (perf on integrated GPUs)
+    this.lod?.update()
     // keep sun shadow centered on the plane
     this.env.followTarget(this.airplane.group.position)
     this.renderer.render(this.scene, this.cam.camera)
@@ -538,11 +549,17 @@ export class FlightEngine {
             })
           }
           // check if all reached → mission success
+          // For crosscountry/storm: also require a landing (onGround, slow)
+          // to match the "land safely" objective.
           if (this.mission.waypoints.every((w) => w.reached)) {
-            this.result = 'success'
-            this.phase = 'ended'
-            this.score += this.mission.rewardXP
-            this.onPhaseChange?.(this.phase, this.result)
+            const needsLanding =
+              this.mission.type === 'crosscountry' || this.mission.type === 'storm'
+            if (!needsLanding || (this.state.onGround && this.state.airspeed < 8)) {
+              this.result = 'success'
+              this.phase = 'ended'
+              this.score += this.mission.rewardXP
+              this.onPhaseChange?.(this.phase, this.result)
+            }
           }
         }
       }

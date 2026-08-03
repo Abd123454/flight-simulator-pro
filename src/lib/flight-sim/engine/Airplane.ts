@@ -19,7 +19,7 @@ export class Airplane {
   group: THREE.Group
   type: AircraftType
   private config: AircraftConfig
-  private fans: THREE.Mesh[] = []
+  private fans: THREE.Group[] = []
   private gearGroups: THREE.Group[] = []
   private gearRetract = 0
   private fanAngle = 0
