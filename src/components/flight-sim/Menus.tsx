@@ -34,95 +34,48 @@ interface Settings {
 
 export function MainMenu({
   onStart,
-  settings,
-  onSettingsChange,
+  onAircraftSelect,
+  muted,
+  onToggleMute,
 }: {
   onStart: () => void
-  settings: Settings
-  onSettingsChange: (s: Settings) => void
+  onAircraftSelect: () => void
+  muted: boolean
+  onToggleMute: () => void
 }) {
-  const [showSettings, setShowSettings] = useState(false)
-
-  if (showSettings) {
-    return (
-      <MenuShell title="Settings" subtitle="Configure your flight">
-        <div className="w-80 rounded-lg border border-white/10 bg-black/30 p-5">
-          <div className="mb-4">
-            <div className="mb-1 flex justify-between text-xs text-white/70">
-              <span className="uppercase tracking-widest">Control Sensitivity</span>
-              <span className="font-mono text-cyan-300">{settings.sensitivity.toFixed(2)}x</span>
-            </div>
-            <Slider
-              value={[settings.sensitivity]}
-              min={0.3}
-              max={2.0}
-              step={0.1}
-              onValueChange={(v) => onSettingsChange({ ...settings, sensitivity: v[0] })}
-            />
-          </div>
-          <div className="mb-4">
-            <div className="mb-1 flex justify-between text-xs text-white/70">
-              <span className="uppercase tracking-widest">Volume</span>
-              <span className="font-mono text-cyan-300">{Math.round(settings.volume * 100)}%</span>
-            </div>
-            <Slider
-              value={[settings.volume]}
-              min={0}
-              max={1}
-              step={0.05}
-              onValueChange={(v) => onSettingsChange({ ...settings, volume: v[0] })}
-            />
-          </div>
-          <div className="mb-4 flex items-center justify-between">
-            <span className="text-xs uppercase tracking-widest text-white/70">Sound</span>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onSettingsChange({ ...settings, muted: !settings.muted })}
-              className="border-white/20 bg-white/5 text-white hover:bg-white/10"
-            >
-              {settings.muted ? 'Off' : 'On'}
-            </Button>
-          </div>
-        </div>
-        <Button
-          onClick={() => setShowSettings(false)}
-          className="w-64 bg-cyan-500 font-bold text-slate-950 hover:bg-cyan-400"
-        >
-          Back
-        </Button>
-      </MenuShell>
-    )
-  }
-
   return (
-    <MenuShell title="Flight Simulator" subtitle="Pro · Boeing 737-800">
+    <MenuShell title="Flight Simulator" subtitle="Pro · Multi-Aircraft Combat Edition">
       <Button
         size="lg"
         onClick={onStart}
         className="w-64 bg-cyan-500 text-lg font-bold text-slate-950 hover:bg-cyan-400"
       >
-        Start Flight
+        Quick Flight (737)
       </Button>
       <Button
         variant="outline"
-        onClick={() => setShowSettings(true)}
+        onClick={onAircraftSelect}
+        className="w-64 border-amber-400/40 bg-amber-950/20 text-amber-200 hover:bg-amber-900/30"
+      >
+        ✈ Select Aircraft & Mission
+      </Button>
+      <Button
+        variant="outline"
+        onClick={onToggleMute}
         className="w-64 border-white/20 bg-white/5 text-white hover:bg-white/10"
       >
-        Settings
+        Sound: {muted ? 'Off' : 'On'}
       </Button>
       <div className="mt-6 max-w-md rounded-lg border border-white/10 bg-black/30 p-4 text-center text-xs leading-relaxed text-white/60">
-        <p className="mb-2 font-semibold text-cyan-300/90">Mission</p>
-        Throttle up with <span className="font-mono text-white/80">Shift</span>. Release brakes, accelerate to ~260 km/h, then
-        tap <span className="font-mono text-white/80">S</span> gently to rotate. Use{' '}
-        <span className="font-mono text-white/80">F</span> for flaps on takeoff/landing. Retract gear with{' '}
-        <span className="font-mono text-white/80">G</span>. Land gently — vertical speed above 5 m/s = crash.
+        <p className="mb-2 font-semibold text-cyan-300/90">4 Aircraft · 4 Mission Types</p>
+        Fly the <span className="text-white/80">737 Airliner</span>, <span className="text-amber-300">F-16 Fighter</span> (with afterburner),
+        <span className="text-red-300"> Extra 300 Stunt</span>, or <span className="text-green-300">C-130 Cargo</span>.
+        Choose Free Flight, Canyon Sprint Race, Landing Challenge, or Target Practice.
       </div>
       <div className="mt-3 max-w-md rounded-lg border border-amber-400/20 bg-amber-950/20 p-3 text-center text-[10px] leading-relaxed text-amber-200/60">
         <span className="font-mono">W/S</span> pitch · <span className="font-mono">A/D</span> roll ·{' '}
-        <span className="font-mono">Q/E</span> rudder · <span className="font-mono">F/V</span> flaps ·{' '}
-        <span className="font-mono">B</span> spoilers · <span className="font-mono">X</span> reverse ·{' '}
-        <span className="font-mono">C</span> camera
+        <span className="font-mono">Shift</span> throttle · <span className="font-mono">G</span> gear ·{' '}
+        <span className="font-mono">F/V</span> flaps · <span className="font-mono">C</span> camera
       </div>
     </MenuShell>
   )
@@ -194,6 +147,7 @@ export function EndScreen({
   maxAlt,
   landingVSpeed,
   landingSpeed,
+  score,
   onRestart,
   onQuit,
 }: {
@@ -202,11 +156,11 @@ export function EndScreen({
   maxAlt: number
   landingVSpeed: number
   landingSpeed: number
+  score: number
   onRestart: () => void
   onQuit: () => void
 }) {
   const success = result === 'success'
-  // landing score: based on vertical speed and landing speed
   const vsScore = success ? Math.max(0, 100 - Math.abs(landingVSpeed) * 30) : 0
   const spScore = success ? Math.max(0, 100 - Math.max(0, landingSpeed - 60) * 2) : 0
   const totalScore = Math.round((vsScore + spScore) / 2)
@@ -214,9 +168,16 @@ export function EndScreen({
 
   return (
     <MenuShell
-      title={success ? 'Landed Safely' : 'Crashed'}
-      subtitle={success ? 'Mission complete' : 'Better luck next time'}
+      title={success ? 'Mission Complete' : 'Mission Failed'}
+      subtitle={success ? 'Well done, pilot' : 'Better luck next time'}
     >
+      {/* Final score */}
+      <div className="mb-3 flex flex-col items-center">
+        <div className="text-[10px] uppercase tracking-widest text-white/40">Final Score</div>
+        <div className={`text-5xl font-black ${success ? 'text-emerald-400' : 'text-red-400'}`}>
+          {score.toLocaleString()}
+        </div>
+      </div>
       <div className="mb-2 flex gap-6 font-mono text-sm text-white/80">
         <div>
           <div className="text-[10px] uppercase tracking-widest text-white/40">Flight Time</div>
@@ -241,10 +202,7 @@ export function EndScreen({
       </div>
       {success && (
         <div className="mb-2 flex flex-col items-center">
-          <div className="text-[10px] uppercase tracking-widest text-white/40">Landing Score</div>
-          <div className={`text-4xl font-black ${totalScore >= 70 ? 'text-emerald-400' : totalScore >= 50 ? 'text-amber-400' : 'text-orange-400'}`}>
-            {totalScore}
-          </div>
+          <div className="text-[10px] uppercase tracking-widest text-white/40">Landing Rating</div>
           <div className={`text-sm font-bold ${totalScore >= 70 ? 'text-emerald-300' : totalScore >= 50 ? 'text-amber-300' : 'text-orange-300'}`}>
             {rating}
           </div>

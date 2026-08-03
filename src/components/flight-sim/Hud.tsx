@@ -81,17 +81,62 @@ export function Hud({ snap, cameraMode }: Props) {
     snap.windDir < 135 ? 'E' :
     snap.windDir < 225 ? 'S' : 'W'
 
+  // mission progress
+  const wps = snap.waypoints
+  const reachedCount = wps.filter((w) => w.reached).length
+  const totalCount = wps.length
+  const tgtReached = snap.targets.filter((t) => t.destroyed).length
+  const tgtTotal = snap.targets.length
+
   return (
     <div className="pointer-events-none absolute inset-0 select-none font-sans">
-      {/* Top-center: compass tape */}
+      {/* Top-center: compass tape + mission info */}
       <div className="absolute left-1/2 top-3 -translate-x-1/2">
         <CompassTape heading={s.heading} width={400} height={36} />
       </div>
 
-      {/* Top-left: speed + AoA */}
+      {/* Mission status bar (below compass) */}
+      <div className="absolute left-1/2 top-12 -translate-x-1/2">
+        <div className="flex items-center gap-4 rounded-md border border-white/15 bg-black/50 px-4 py-1 backdrop-blur-sm">
+          <span className="font-mono text-xs text-amber-300">{snap.missionName}</span>
+          {totalCount > 0 && (
+            <span className="font-mono text-xs text-cyan-300">
+              GATES {reachedCount}/{totalCount}
+            </span>
+          )}
+          {tgtTotal > 0 && (
+            <span className="font-mono text-xs text-red-300">
+              TARGETS {tgtReached}/{tgtTotal}
+            </span>
+          )}
+          {snap.missionType !== 'freeflight' && (
+            <span className="font-mono text-xs text-white/70">
+              ⏱ {Math.floor(snap.missionTime / 60)}:{String(Math.floor(snap.missionTime % 60)).padStart(2, '0')}
+            </span>
+          )}
+          <span className="font-mono text-xs font-bold text-emerald-300">
+            SCORE {snap.score.toLocaleString()}
+          </span>
+          {snap.combo > 1 && (
+            <span className="font-mono text-xs font-bold text-amber-400 animate-pulse">
+              ×{snap.combo} COMBO
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Top-left: speed + AoA + aircraft name */}
       <div className="absolute left-3 top-14 flex flex-col gap-2">
+        <div className="rounded-md border border-white/20 bg-black/40 px-2 py-0.5 font-mono text-[10px] text-cyan-300">
+          {snap.aircraftName}
+        </div>
         <Panel title="Speed" value={String(speedKmh)} unit="km/h" />
         <Panel title="AoA" value={aoa} unit="°" sub={`β ${s.sideslip.toFixed(0)}°`} warn={stallNear} />
+        {snap.afterburner && (
+          <div className="animate-pulse rounded-md border border-blue-400/50 bg-blue-950/50 px-2 py-1 text-center font-mono text-[10px] font-bold text-blue-300">
+            ⚡ AFTERBURNER
+          </div>
+        )}
         {snap.debug && (
           <div className="rounded-md border border-emerald-400/30 bg-black/45 px-3 py-1.5 font-mono text-[10px] text-emerald-300/90 backdrop-blur-sm">
             <div>FPS: {Math.round(snap.fps)}</div>
@@ -102,7 +147,7 @@ export function Hud({ snap, cameraMode }: Props) {
         )}
       </div>
 
-      {/* Top-right: camera + gear status + wind */}
+      {/* Top-right: camera + gear + wind */}
       <div className="absolute right-3 top-14 flex flex-col items-end gap-2">
         <div className="rounded border border-amber-300/30 bg-black/40 px-2 py-0.5 font-mono text-[10px] text-amber-200/90">
           VIEW: {modeLabel}
@@ -124,7 +169,7 @@ export function Hud({ snap, cameraMode }: Props) {
         <AltimeterTape altitude={s.altitude} verticalSpeed={s.verticalSpeed} height={200} width={56} />
       </div>
 
-      {/* Bottom-left: throttle + rpm + flaps */}
+      {/* Bottom-left: throttle + flaps */}
       <div className="absolute bottom-3 left-3 flex flex-col gap-2">
         <Panel
           title="Throttle"
@@ -143,10 +188,7 @@ export function Hud({ snap, cameraMode }: Props) {
             <div className="text-[10px] font-semibold uppercase tracking-widest text-cyan-300/80">Flaps</div>
             <div className="flex gap-0.5">
               {[0, 1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className={`h-3 w-2 rounded-sm ${i < s.flaps ? 'bg-cyan-400' : 'bg-cyan-900/50'}`}
-                />
+                <div key={i} className={`h-3 w-2 rounded-sm ${i < s.flaps ? 'bg-cyan-400' : 'bg-cyan-900/50'}`} />
               ))}
             </div>
           </div>
@@ -164,10 +206,19 @@ export function Hud({ snap, cameraMode }: Props) {
         <Minimap px={s.position.x} pz={s.position.z} heading={s.heading} size={150} />
       </div>
 
-      {/* ILS indicator (only when in approach range) */}
+      {/* ILS indicator (landing approach only) */}
       <ILSIndicator localizer={snap.ilsLocalizer} glideslope={snap.ilsGlideslope} inRange={snap.ilsInRange} />
 
-      {/* Small G-force + VSI readouts (off-center, unobtrusive) */}
+      {/* Next waypoint directional indicator */}
+      {snap.nextWaypoint && (
+        <div className="absolute left-1/2 top-[30%] -translate-x-1/2">
+          <div className="rounded-md border border-cyan-400/40 bg-black/50 px-3 py-1 font-mono text-[10px] text-cyan-300 backdrop-blur-sm">
+            → GATE {snap.nextWaypoint.id}
+          </div>
+        </div>
+      )}
+
+      {/* Small G + VSI readouts */}
       <div className="absolute left-[calc(50%+70px)] top-1/2 -translate-y-1/2">
         <div className="rounded border border-white/20 bg-black/50 px-1.5 py-0.5 font-mono text-[10px] text-white/70">
           {s.gForce.toFixed(1)}G
@@ -181,28 +232,21 @@ export function Hud({ snap, cameraMode }: Props) {
 
       {/* Stall warning */}
       {(stallOn || stallNear) && (
-        <div
-          className={`absolute left-1/2 top-[26%] -translate-x-1/2 rounded-md border px-4 py-1.5 font-mono text-lg font-bold ${
-            stallOn
-              ? 'animate-pulse border-red-500 bg-red-900/50 text-red-300'
-              : 'border-orange-500/70 bg-orange-900/40 text-orange-300'
-          }`}
-        >
+        <div className={`absolute left-1/2 top-[26%] -translate-x-1/2 rounded-md border px-4 py-1.5 font-mono text-lg font-bold ${
+          stallOn ? 'animate-pulse border-red-500 bg-red-900/50 text-red-300' : 'border-orange-500/70 bg-orange-900/40 text-orange-300'
+        }`}>
           {stallOn ? '⚠ STALL ⚠' : '⚠ APPROACHING STALL'}
         </div>
       )}
 
-      {/* Bottom-center: controls hint */}
+      {/* Controls hint */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-md border border-white/15 bg-black/40 px-3 py-1 font-mono text-[10px] text-white/70 backdrop-blur-sm">
         <span className="text-cyan-300">W/S</span> pitch ·{' '}
         <span className="text-cyan-300">A/D</span> roll ·{' '}
-        <span className="text-cyan-300">Q/E</span> rudder ·{' '}
         <span className="text-cyan-300">Shift/Ctrl</span> throttle ·{' '}
         <span className="text-cyan-300">Space</span> brake ·{' '}
         <span className="text-cyan-300">G</span> gear ·{' '}
         <span className="text-cyan-300">F/V</span> flaps ·{' '}
-        <span className="text-cyan-300">B</span> spoilers ·{' '}
-        <span className="text-cyan-300">X</span> reverse ·{' '}
         <span className="text-cyan-300">C</span> camera ·{' '}
         <span className="text-cyan-300">Esc</span> pause
       </div>

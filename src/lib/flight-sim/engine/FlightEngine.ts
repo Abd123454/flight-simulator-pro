@@ -9,6 +9,8 @@ import { InputController } from './InputController'
 import { AudioEngine } from './AudioEngine'
 import { stepFlight, createInitialState, PHYS } from '../physics'
 import { WeatherSystem } from '../weather'
+import type { AircraftConfig } from '../aircraft-config'
+import type { MissionConfig, Waypoint, Target } from '../missions'
 import type { CameraMode, FlightState, GamePhase } from '../types'
 
 const STEP = 1 / 60
@@ -25,10 +27,20 @@ export interface HudSnapshot {
   texMemory: number
   windSpeed: number
   windDir: number
-  // ILS deviation: -1..1 (left/right of localizer, below/above glideslope)
   ilsLocalizer: number
   ilsGlideslope: number
   ilsInRange: boolean
+  // mission data
+  missionType: string
+  missionName: string
+  missionTime: number
+  waypoints: Waypoint[]
+  targets: Target[]
+  nextWaypoint?: Waypoint
+  score: number
+  combo: number
+  afterburner: boolean
+  aircraftName: string
 }
 
 export type FlightResult = 'none' | 'flying' | 'success' | 'crash'
@@ -38,7 +50,7 @@ export class FlightEngine {
   scene: THREE.Scene
   private env: Environment
   private airport: Airport
-  private airplane: Airplane
+  airplane: Airplane
   private cam: CameraController
   input: InputController
   audio: AudioEngine
@@ -50,6 +62,20 @@ export class FlightEngine {
   result: FlightResult = 'none'
   debug = false
   muted = false
+
+  // aircraft + mission
+  aircraftConfig: AircraftConfig
+  mission: MissionConfig
+  afterburner = false
+  score = 0
+  combo = 0
+  comboTimer = 0
+  missionStartTime = 0
+  missionElapsed = 0
+
+  // waypoint/target visuals
+  private waypointMeshes: { mesh: THREE.Group; wp: Waypoint }[] = []
+  private targetMeshes: { mesh: THREE.Group; target: Target }[] = []
 
   private container: HTMLElement
   private raf = 0
@@ -64,8 +90,14 @@ export class FlightEngine {
   onPhaseChange: ((phase: GamePhase, result: FlightResult) => void) | null = null
   onCameraModeChange: ((mode: CameraMode) => void) | null = null
 
-  constructor(container: HTMLElement) {
+  constructor(
+    container: HTMLElement,
+    aircraftConfig: AircraftConfig,
+    mission: MissionConfig
+  ) {
     this.container = container
+    this.aircraftConfig = aircraftConfig
+    this.mission = mission
     this.state = createInitialState()
 
     const w = container.clientWidth || 1280
@@ -76,8 +108,6 @@ export class FlightEngine {
       powerPreference: 'high-performance',
       stencil: false,
     })
-    // Cap pixel ratio at 1.0 to protect iGPU fill rate (the single biggest
-    // performance lever on Intel HD 630).
     this.renderer.setPixelRatio(1)
     this.renderer.setSize(w, h)
     this.renderer.shadowMap.enabled = true
@@ -94,8 +124,13 @@ export class FlightEngine {
     this.env = new Environment(this.scene, this.renderer)
     this.airport = new Airport()
     this.scene.add(this.airport.group)
-    this.airplane = new Airplane()
+    this.airplane = new Airplane(aircraftConfig)
     this.scene.add(this.airplane.group)
+
+    // build mission visuals (waypoints / targets)
+    this.buildMissionVisuals()
+    this.spawnAtMission()
+
     this.applyStateToMesh()
 
     this.cam = new CameraController(w / h)
@@ -103,10 +138,93 @@ export class FlightEngine {
     this.input.attach(window)
     this.audio = new AudioEngine()
     this.weather = new WeatherSystem()
-    this.weather.setWind(5, 270) // light breeze from the west
+    this.weather.setWind(5, 270)
 
-    // initial camera placement (chase) — behind the aircraft at the south end
     this.cam.camera.position.set(0, 20, 1500)
+  }
+
+  /** Build 3D visuals for waypoints (racing gates) and targets. */
+  private buildMissionVisuals() {
+    // clear old
+    for (const w of this.waypointMeshes) this.scene.remove(w.mesh)
+    for (const t of this.targetMeshes) this.scene.remove(t.mesh)
+    this.waypointMeshes = []
+    this.targetMeshes = []
+
+    // waypoint gates: floating rings
+    if (this.mission.waypoints) {
+      for (const wp of this.mission.waypoints) {
+        const gate = new THREE.Group()
+        const ringGeo = new THREE.TorusGeometry(wp.radius, 3, 8, 24)
+        const ringMat = new THREE.MeshStandardMaterial({
+          color: 0x00ffff,
+          emissive: 0x00ffff,
+          emissiveIntensity: 1.5,
+          transparent: true,
+          opacity: 0.7,
+        })
+        const ring = new THREE.Mesh(ringGeo, ringMat)
+        ring.rotation.y = Math.PI / 2 // face along Z (flight direction)
+        gate.add(ring)
+        // marker pole up
+        const pole = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.5, 0.5, 20, 6),
+          new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x008888, emissiveIntensity: 0.5 })
+        )
+        pole.position.y = -10
+        gate.add(pole)
+        gate.position.set(wp.position.x, wp.position.y, wp.position.z)
+        this.scene.add(gate)
+        this.waypointMeshes.push({ mesh: gate, wp })
+      }
+    }
+    // targets: red glowing spheres
+    if (this.mission.targets) {
+      for (const target of this.mission.targets) {
+        const grp = new THREE.Group()
+        const core = new THREE.Mesh(
+          new THREE.SphereGeometry(15, 10, 8),
+          new THREE.MeshStandardMaterial({
+            color: 0xff2222,
+            emissive: 0xff0000,
+            emissiveIntensity: 1.5,
+          })
+        )
+        grp.add(core)
+        // ring around it
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(25, 2, 6, 16),
+          new THREE.MeshStandardMaterial({ color: 0xff4400, emissive: 0xff2200, emissiveIntensity: 1 })
+        )
+        ring.rotation.x = Math.PI / 2
+        grp.add(ring)
+        grp.position.set(target.position.x, target.position.y, target.position.z)
+        this.scene.add(grp)
+        this.targetMeshes.push({ mesh: grp, target })
+      }
+    }
+  }
+
+  /** Spawn the aircraft at the mission's start position/heading. */
+  private spawnAtMission() {
+    const m = this.mission
+    this.state.position = { ...m.spawnPosition }
+    this.state.velocity = { x: 0, y: 0, z: 0 }
+    this.orientation.identity()
+    // set heading by rotating about Y
+    if (m.spawnHeading !== 0) {
+      const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -m.spawnHeading)
+      this.orientation.copy(q)
+    }
+    this.state.onGround = m.spawnPosition.y <= PHYS.groundY + 1
+    this.state.throttle = 0
+    this.state.gearDown = true
+    this.state.flaps = 0
+    this.state.spoilers = false
+    this.state.reverseThrust = false
+    this.state.flightTime = 0
+    this.state.crashed = false
+    this.state.landed = false
   }
 
   /** Start the render loop only (scene visible behind menus). Physics idle. */
@@ -121,6 +239,10 @@ export class FlightEngine {
     this.phase = 'flying'
     this.result = 'flying'
     this.prevOnGround = true
+    this.score = 0
+    this.combo = 0
+    this.missionStartTime = performance.now()
+    this.missionElapsed = 0
     this.lastTime = performance.now()
     this.onPhaseChange?.(this.phase, this.result)
   }
@@ -168,12 +290,16 @@ export class FlightEngine {
       // throttle
       if (this.input.isThrottleUp()) this.state.throttle = Math.min(1, this.state.throttle + dt * 0.35)
       if (this.input.isThrottleDown()) this.state.throttle = Math.max(0, this.state.throttle - dt * 0.5)
+      // afterburner for fighter (toggle with Shift double-tap or hold Tab)
+      if (this.aircraftConfig.hasAfterburner) {
+        this.afterburner = this.input.isThrottleUp() && this.state.throttle > 0.9
+      }
       // gear
       if (this.input.consumeGearToggle()) {
         this.state.gearDown = !this.state.gearDown
         this.audio.gearSound()
       }
-      // flaps (F = extend, V = retract), 0..3 stages
+      // flaps
       if (this.input.consumeFlapsDown()) {
         this.state.flaps = Math.min(3, this.state.flaps + 1)
         this.audio.gearSound()
@@ -182,19 +308,17 @@ export class FlightEngine {
         this.state.flaps = Math.max(0, this.state.flaps - 1)
         this.audio.gearSound()
       }
-      // spoilers / airbrake (B)
+      // spoilers
       if (this.input.consumeSpoilerToggle()) {
         this.state.spoilers = !this.state.spoilers
       }
-      // reverse thrust (X) — only effective on ground
+      // reverse thrust
       if (this.input.consumeReverseToggle()) {
         this.state.reverseThrust = !this.state.reverseThrust
       }
-      // auto-disengage reverse when airborne
       if (!this.state.onGround) this.state.reverseThrust = false
 
-      // fixed-timestep physics — carry over accumulated time (cap to avoid
-      // spiral of death), so the sim stays real-time even at low FPS.
+      // physics
       const controls = this.input.getControls()
       this.accumulator += dt
       if (this.accumulator > 0.5) this.accumulator = 0.5
@@ -212,10 +336,22 @@ export class FlightEngine {
         steps++
       }
 
+      // mission time
+      this.missionElapsed = (performance.now() - this.missionStartTime) / 1000
+
+      // check waypoint / target hits
+      this.checkMissionObjectives()
+
       this.applyStateToMesh()
-      this.airplane.update(this.state, dt)
+      this.airplane.update(this.state, dt, this.afterburner)
       this.airport.update(dt, this.weather.weather)
       this.weather.update(dt)
+
+      // combo decay
+      if (this.combo > 0) {
+        this.comboTimer -= dt
+        if (this.comboTimer <= 0) this.combo = 0
+      }
 
       // trigger crash smoke effect on new crash
       if (!wasCrashed && this.state.crashed) {
@@ -266,6 +402,8 @@ export class FlightEngine {
       const idealAlt = Math.max(0, distToThreshold * Math.tan(3 * Math.PI / 180)) + PHYS.groundY
       const gsDev = (s.altitude - idealAlt) / 100
       const locDev = -s.position.x / 100
+      // next waypoint (first unreached)
+      const nextWp = this.mission.waypoints?.find((w) => !w.reached)
       this.onState({
         state: s,
         fps: this.fps,
@@ -280,7 +418,91 @@ export class FlightEngine {
         ilsLocalizer: THREE.MathUtils.clamp(locDev, -1, 1),
         ilsGlideslope: THREE.MathUtils.clamp(gsDev, -1, 1),
         ilsInRange: onApproach,
+        missionType: this.mission.type,
+        missionName: this.mission.name,
+        missionTime: this.missionElapsed,
+        waypoints: this.mission.waypoints ?? [],
+        targets: this.mission.targets ?? [],
+        nextWaypoint: nextWp,
+        score: this.score,
+        combo: this.combo,
+        afterburner: this.afterburner,
+        aircraftName: this.aircraftConfig.name,
       })
+    }
+  }
+
+  /** Check if the player reached waypoints or hit targets. */
+  private checkMissionObjectives() {
+    const pos = this.state.position
+    // waypoints
+    if (this.mission.waypoints) {
+      for (const wp of this.mission.waypoints) {
+        if (wp.reached) continue
+        const dx = pos.x - wp.position.x
+        const dy = pos.y - wp.position.y
+        const dz = pos.z - wp.position.z
+        const dist = Math.hypot(dx, dy, dz)
+        if (dist < wp.radius) {
+          wp.reached = true
+          this.score += 100 * (1 + this.combo)
+          this.combo += 1
+          this.comboTimer = 5
+          this.audio.gearSound()
+          // turn gate green
+          const meshEntry = this.waypointMeshes.find((w) => w.wp.id === wp.id)
+          if (meshEntry) {
+            meshEntry.mesh.traverse((o) => {
+              const m = o as THREE.Mesh
+              if (m.material) {
+                const mat = m.material as THREE.MeshStandardMaterial
+                mat.color.setHex(0x00ff00)
+                mat.emissive.setHex(0x00ff00)
+              }
+            })
+          }
+          // check if all reached → mission success
+          if (this.mission.waypoints.every((w) => w.reached)) {
+            this.result = 'success'
+            this.phase = 'ended'
+            this.score += this.mission.rewardXP
+            this.onPhaseChange?.(this.phase, this.result)
+          }
+        }
+      }
+    }
+    // targets
+    if (this.mission.targets) {
+      for (const target of this.mission.targets) {
+        if (target.destroyed) continue
+        const dx = pos.x - target.position.x
+        const dy = pos.y - target.position.y
+        const dz = pos.z - target.position.z
+        const dist = Math.hypot(dx, dy, dz)
+        if (dist < 20) {
+          target.destroyed = true
+          this.score += 200 * (1 + this.combo)
+          this.combo += 1
+          this.comboTimer = 5
+          this.audio.touchdown()
+          // hide target mesh
+          const meshEntry = this.targetMeshes.find((t) => t.target.id === target.id)
+          if (meshEntry) meshEntry.mesh.visible = false
+          // check if all destroyed → mission success
+          if (this.mission.targets.every((t) => t.destroyed)) {
+            this.result = 'success'
+            this.phase = 'ended'
+            this.score += this.mission.rewardXP
+            this.onPhaseChange?.(this.phase, this.result)
+          }
+        }
+      }
+    }
+    // time limit
+    if (this.mission.timeLimit && this.missionElapsed > this.mission.timeLimit) {
+      this.result = 'crash'
+      this.phase = 'ended'
+      this.onPhaseChange?.(this.phase, this.result)
     }
   }
 
