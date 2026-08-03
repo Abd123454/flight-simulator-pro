@@ -1,5 +1,4 @@
 'use client'
-import { AttitudeIndicator } from './AttitudeIndicator'
 import { Minimap } from './Minimap'
 import { CompassTape } from './CompassTape'
 import { AltimeterTape } from './AltimeterTape'
@@ -39,11 +38,34 @@ function GearLight({ down, label }: { down: boolean; label: string }) {
   )
 }
 
+/** ILS indicator: cross with localizer (horizontal) and glideslope (vertical) dots. */
+function ILSIndicator({ localizer, glideslope, inRange }: { localizer: number; glideslope: number; inRange: boolean }) {
+  if (!inRange) return null
+  const cx = 50
+  const cy = 50
+  const locX = cx + localizer * 20
+  const gsY = cy - glideslope * 20
+  return (
+    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+      <svg width="100" height="100" viewBox="0 0 100 100" className="opacity-80">
+        <line x1="20" y1={cy} x2="80" y2={cy} stroke="rgba(180,220,255,0.5)" strokeWidth="1" />
+        {[30, 40, 60, 70].map((x) => (
+          <line key={x} x1={x} y1={cy - 3} x2={x} y2={cy + 3} stroke="rgba(180,220,255,0.4)" strokeWidth="1" />
+        ))}
+        <line x1={cx} y1="20" x2={cx} y2="80" stroke="rgba(180,220,255,0.5)" strokeWidth="1" />
+        {[30, 40, 60, 70].map((y) => (
+          <line key={y} x1={cx - 3} y1={y} x2={cx + 3} y2={y} stroke="rgba(180,220,255,0.4)" strokeWidth="1" />
+        ))}
+        <circle cx={locX} cy={cy} r="3" fill="#ffd23f" />
+        <circle cx={cx} cy={gsY} r="3" fill="#39ff14" />
+      </svg>
+    </div>
+  )
+}
+
 export function Hud({ snap, cameraMode }: Props) {
   const s = snap.state
   const speedKmh = Math.round(s.airspeed * 3.6)
-  const altM = Math.round(s.altitude)
-  const hdg = Math.round(s.heading)
   const thr = Math.round(s.throttle * 100)
   const aoa = s.aoa.toFixed(1)
   const vsiFpm = Math.round(s.verticalSpeed * 196.85)
@@ -52,10 +74,12 @@ export function Hud({ snap, cameraMode }: Props) {
 
   const stallNear = Math.abs(s.aoa) > 12 && !s.stalled
   const stallOn = s.stalled
-
-  // landing gear indicators (3 wheels: nose, left main, right main)
-  // gearRetract is animated in the mesh; use gearDown state for the lights
   const gearDown = s.gearDown
+
+  const windCardinal =
+    snap.windDir >= 315 || snap.windDir < 45 ? 'N' :
+    snap.windDir < 135 ? 'E' :
+    snap.windDir < 225 ? 'S' : 'W'
 
   return (
     <div className="pointer-events-none absolute inset-0 select-none font-sans">
@@ -67,23 +91,23 @@ export function Hud({ snap, cameraMode }: Props) {
       {/* Top-left: speed + AoA */}
       <div className="absolute left-3 top-14 flex flex-col gap-2">
         <Panel title="Speed" value={String(speedKmh)} unit="km/h" />
-        <Panel title="AoA" value={aoa} unit="°" sub={stallNear ? '⚠ HIGH' : undefined} warn={stallNear} />
+        <Panel title="AoA" value={aoa} unit="°" sub={`β ${s.sideslip.toFixed(0)}°`} warn={stallNear} />
         {snap.debug && (
           <div className="rounded-md border border-emerald-400/30 bg-black/45 px-3 py-1.5 font-mono text-[10px] text-emerald-300/90 backdrop-blur-sm">
             <div>FPS: {Math.round(snap.fps)}</div>
             <div>Draws: {snap.drawCalls}</div>
             <div>Tris: {snap.triangles.toLocaleString()}</div>
-            <div>Geos: {snap.geomMemory}</div>
-            <div>Texs: {snap.texMemory}</div>
+            <div>Wind: {snap.windSpeed.toFixed(0)}m/s {windCardinal}</div>
           </div>
         )}
       </div>
 
-      {/* Top-right: camera + gear status */}
+      {/* Top-right: camera + gear status + wind */}
       <div className="absolute right-3 top-14 flex flex-col items-end gap-2">
         <div className="rounded border border-amber-300/30 bg-black/40 px-2 py-0.5 font-mono text-[10px] text-amber-200/90">
           VIEW: {modeLabel}
         </div>
+        <Panel title="Wind" value={snap.windSpeed.toFixed(0)} unit="m/s" sub={`${Math.round(snap.windDir)}° ${windCardinal}`} />
         <Panel title="Gear" value={gear} />
         <div className="rounded-md border border-cyan-400/30 bg-black/45 px-3 py-1.5 backdrop-blur-sm">
           <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-cyan-300/80">Gear Pos</div>
@@ -114,7 +138,6 @@ export function Hud({ snap, cameraMode }: Props) {
             style={{ width: `${thr}%` }}
           />
         </div>
-        {/* Flaps + spoilers indicator */}
         <div className="flex gap-2">
           <div className="rounded-md border border-cyan-400/30 bg-black/45 px-3 py-1.5 backdrop-blur-sm">
             <div className="text-[10px] font-semibold uppercase tracking-widest text-cyan-300/80">Flaps</div>
@@ -141,20 +164,25 @@ export function Hud({ snap, cameraMode }: Props) {
         <Minimap px={s.position.x} pz={s.position.z} heading={s.heading} size={150} />
       </div>
 
-      {/* Center: attitude indicator + crosshair */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-        <AttitudeIndicator roll={s.roll} pitch={s.pitch} size={150} />
+      {/* ILS indicator (only when in approach range) */}
+      <ILSIndicator localizer={snap.ilsLocalizer} glideslope={snap.ilsGlideslope} inRange={snap.ilsInRange} />
+
+      {/* Small G-force + VSI readouts (off-center, unobtrusive) */}
+      <div className="absolute left-[calc(50%+70px)] top-1/2 -translate-y-1/2">
+        <div className="rounded border border-white/20 bg-black/50 px-1.5 py-0.5 font-mono text-[10px] text-white/70">
+          {s.gForce.toFixed(1)}G
+        </div>
       </div>
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-        <div className="h-5 w-5 rounded-full border border-amber-300/70" />
-        <div className="absolute left-1/2 top-1/2 h-px w-8 -translate-x-1/2 -translate-y-1/2 bg-amber-300/70" />
-        <div className="absolute left-1/2 top-1/2 h-8 w-px -translate-x-1/2 -translate-y-1/2 bg-amber-300/70" />
+      <div className="absolute left-[calc(50%-100px)] top-1/2 -translate-y-1/2">
+        <div className="rounded border border-white/20 bg-black/50 px-1.5 py-0.5 font-mono text-[10px] text-white/70">
+          VS {vsiFpm > 0 ? '+' : ''}{vsiFpm}fpm
+        </div>
       </div>
 
       {/* Stall warning */}
       {(stallOn || stallNear) && (
         <div
-          className={`absolute left-1/2 top-[22%] -translate-x-1/2 rounded-md border px-4 py-1.5 font-mono text-lg font-bold ${
+          className={`absolute left-1/2 top-[26%] -translate-x-1/2 rounded-md border px-4 py-1.5 font-mono text-lg font-bold ${
             stallOn
               ? 'animate-pulse border-red-500 bg-red-900/50 text-red-300'
               : 'border-orange-500/70 bg-orange-900/40 text-orange-300'
@@ -163,13 +191,6 @@ export function Hud({ snap, cameraMode }: Props) {
           {stallOn ? '⚠ STALL ⚠' : '⚠ APPROACHING STALL'}
         </div>
       )}
-
-      {/* G-force indicator (center-right of attitude) */}
-      <div className="absolute left-[calc(50%+90px)] top-1/2 -translate-y-1/2">
-        <div className="rounded border border-white/20 bg-black/50 px-1.5 py-0.5 font-mono text-[10px] text-white/70">
-          {s.gForce.toFixed(1)}G
-        </div>
-      </div>
 
       {/* Bottom-center: controls hint */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-md border border-white/15 bg-black/40 px-3 py-1 font-mono text-[10px] text-white/70 backdrop-blur-sm">

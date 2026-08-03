@@ -48,21 +48,26 @@ export class CameraController {
 
   private updateChase(state: FlightState, orientation: THREE.Quaternion, dt: number) {
     // offset in airplane local space: behind (+Z) and above (+Y)
-    _eye.set(0, 13, 48)
+    _eye.set(0, 14, 52)
     _desired.copy(_eye).applyQuaternion(orientation)
     _desired.x += state.position.x
     _desired.y += state.position.y
     _desired.z += state.position.z
 
-    const k = 1 - Math.exp(-dt * 4.5)
+    // Frame-rate-independent damping. Lower stiffness when on the ground for
+    // a smoother taxi experience; higher when maneuvering for responsiveness.
+    const speed = state.airspeed
+    const stiffness = state.onGround ? 2.5 : 4.0 + Math.min(speed / 50, 2.0)
+    const k = 1 - Math.exp(-dt * stiffness)
     this.camera.position.lerp(_desired, k)
 
-    // look at a point ahead of the airplane
+    // look at a point ahead of the airplane — lead increases with speed
     _fwd.set(0, 0, -1).applyQuaternion(orientation)
+    const lead = 40 + Math.min(speed * 0.3, 60)
     _lookTarget.set(
-      state.position.x + _fwd.x * 40,
-      state.position.y + _fwd.y * 40 + 2,
-      state.position.z + _fwd.z * 40
+      state.position.x + _fwd.x * lead,
+      state.position.y + _fwd.y * lead + 2,
+      state.position.z + _fwd.z * lead
     )
     this.camera.up.set(0, 1, 0)
     this.camera.lookAt(_lookTarget)

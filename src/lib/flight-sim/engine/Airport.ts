@@ -296,13 +296,22 @@ export class Airport {
     this.windsock.userData.baseZ = z
   }
 
-  update(dt: number) {
+  update(dt: number, weather?: { windX: number; windZ: number; windSpeed: number }) {
     this.windsockPhase += dt * 4
     const sock = this.windsock.userData.sock as THREE.Mesh
     if (sock) {
-      // gentle waving in the wind (pointing north)
-      sock.rotation.z = Math.PI / 2 + Math.sin(this.windsockPhase) * 0.08
-      sock.rotation.y = Math.sin(this.windsockPhase * 0.7) * 0.05
+      // Windsock points in the direction the wind blows TOWARD.
+      const wx = weather?.windX ?? 0
+      const wz = weather?.windZ ?? 0
+      const windAngle = Math.atan2(wx, -wz) // 0 = north
+      // base orientation: cone points along +X after rotation.z=PI/2 (toward +X = east)
+      // align the sock's pointing axis with the wind direction
+      sock.rotation.y = windAngle
+      sock.rotation.z = Math.PI / 2 + Math.sin(this.windsockPhase) * 0.06
+      // inflate: stretch with stronger wind
+      const speed = weather?.windSpeed ?? 0
+      const inflate = THREE.MathUtils.clamp(speed / 15, 0.3, 1)
+      sock.scale.set(inflate, 1, 1)
     }
   }
 }

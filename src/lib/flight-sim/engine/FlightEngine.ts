@@ -8,6 +8,7 @@ import { CameraController } from './CameraController'
 import { InputController } from './InputController'
 import { AudioEngine } from './AudioEngine'
 import { stepFlight, createInitialState, PHYS } from '../physics'
+import { WeatherSystem } from '../weather'
 import type { CameraMode, FlightState, GamePhase } from '../types'
 
 const STEP = 1 / 60
@@ -22,6 +23,12 @@ export interface HudSnapshot {
   debug: boolean
   geomMemory: number
   texMemory: number
+  windSpeed: number
+  windDir: number
+  // ILS deviation: -1..1 (left/right of localizer, below/above glideslope)
+  ilsLocalizer: number
+  ilsGlideslope: number
+  ilsInRange: boolean
 }
 
 export type FlightResult = 'none' | 'flying' | 'success' | 'crash'
@@ -35,6 +42,7 @@ export class FlightEngine {
   private cam: CameraController
   input: InputController
   audio: AudioEngine
+  weather: WeatherSystem
 
   private orientation = new THREE.Quaternion()
   state: FlightState
@@ -94,6 +102,8 @@ export class FlightEngine {
     this.input = new InputController()
     this.input.attach(window)
     this.audio = new AudioEngine()
+    this.weather = new WeatherSystem()
+    this.weather.setWind(5, 270) // light breeze from the west
 
     // initial camera placement (chase)
     this.cam.camera.position.set(0, 20, -1300)
@@ -192,9 +202,8 @@ export class FlightEngine {
       const wasCrashed = this.state.crashed
       while (this.accumulator >= STEP && steps < 30) {
         try {
-          stepFlight(this.state, this.orientation, controls, STEP)
+          stepFlight(this.state, this.orientation, controls, STEP, this.weather.weather)
         } catch (err) {
-          // never let a physics error kill the render loop silently
           console.error('[FlightSim] physics error:', err)
           this.accumulator = 0
           break
@@ -205,7 +214,8 @@ export class FlightEngine {
 
       this.applyStateToMesh()
       this.airplane.update(this.state, dt)
-      this.airport.update(dt)
+      this.airport.update(dt, this.weather.weather)
+      this.weather.update(dt)
 
       // trigger crash smoke effect on new crash
       if (!wasCrashed && this.state.crashed) {
@@ -243,8 +253,19 @@ export class FlightEngine {
     // HUD snapshot
     if (this.onState) {
       const info = this.renderer.info
+      const s = this.state
+      // ILS for the northbound runway (threshold at z=-1500, approach from south).
+      // Localizer: lateral deviation from runway centerline (x=0).
+      // Glideslope: vertical deviation from 3° descent path to threshold.
+      const rwyThresholdZ = -1500
+      const distToThreshold = Math.abs(s.position.z - rwyThresholdZ)
+      const onApproach = s.position.z < rwyThresholdZ + 200 && distToThreshold < 8000
+      // ideal altitude at this distance for a 3° glideslope
+      const idealAlt = Math.max(0, (rwyThresholdZ - s.position.z) * Math.tan(3 * Math.PI / 180)) + PHYS.groundY
+      const gsDev = (s.altitude - idealAlt) / 100 // normalize: ~100m = full scale
+      const locDev = -s.position.x / 100 // normalize: ~100m = full scale
       this.onState({
-        state: this.state,
+        state: s,
         fps: this.fps,
         drawCalls: info.render.calls,
         triangles: info.render.triangles,
@@ -252,6 +273,11 @@ export class FlightEngine {
         debug: this.debug,
         geomMemory: info.memory.geometries,
         texMemory: info.memory.textures,
+        windSpeed: this.weather.weather.windSpeed,
+        windDir: this.weather.weather.windDir,
+        ilsLocalizer: THREE.MathUtils.clamp(locDev, -1, 1),
+        ilsGlideslope: THREE.MathUtils.clamp(gsDev, -1, 1),
+        ilsInRange: onApproach,
       })
     }
   }

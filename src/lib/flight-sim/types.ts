@@ -31,6 +31,7 @@ export interface FlightState {
   verticalSpeed: number // m/s
   throttle: number // 0..1 actual
   aoa: number // degrees
+  sideslip: number // degrees (beta)
   gForce: number
   stalled: boolean
   onGround: boolean
