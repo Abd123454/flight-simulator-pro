@@ -41,6 +41,7 @@ export interface HudSnapshot {
   combo: number
   afterburner: boolean
   aircraftName: string
+  gamepadConnected: boolean
 }
 
 export type FlightResult = 'none' | 'flying' | 'success' | 'crash'
@@ -287,9 +288,15 @@ export class FlightEngine {
     }
 
     if (this.phase === 'flying') {
-      // throttle
-      if (this.input.isThrottleUp()) this.state.throttle = Math.min(1, this.state.throttle + dt * 0.35)
-      if (this.input.isThrottleDown()) this.state.throttle = Math.max(0, this.state.throttle - dt * 0.5)
+      // throttle (keyboard: Shift/Ctrl, or gamepad triggers)
+      const controls = this.input.getControls()
+      if (controls.gamepadThrottle !== undefined && controls.gamepadThrottle !== 0) {
+        // gamepad triggers: RT=up, LT=down, analog
+        this.state.throttle = Math.max(0, Math.min(1, this.state.throttle + controls.gamepadThrottle * dt * 0.5))
+      } else {
+        if (this.input.isThrottleUp()) this.state.throttle = Math.min(1, this.state.throttle + dt * 0.35)
+        if (this.input.isThrottleDown()) this.state.throttle = Math.max(0, this.state.throttle - dt * 0.5)
+      }
       // afterburner for fighter (toggle with Shift double-tap or hold Tab)
       if (this.aircraftConfig.hasAfterburner) {
         this.afterburner = this.input.isThrottleUp() && this.state.throttle > 0.9
@@ -319,7 +326,6 @@ export class FlightEngine {
       if (!this.state.onGround) this.state.reverseThrust = false
 
       // physics
-      const controls = this.input.getControls()
       this.accumulator += dt
       if (this.accumulator > 0.5) this.accumulator = 0.5
       let steps = 0
@@ -428,6 +434,7 @@ export class FlightEngine {
         combo: this.combo,
         afterburner: this.afterburner,
         aircraftName: this.aircraftConfig.name,
+        gamepadConnected: this.input.isGamepadConnected(),
       })
     }
   }

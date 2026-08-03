@@ -128,7 +128,7 @@ export function Hud({ snap, cameraMode }: Props) {
       {/* Top-left: speed + AoA + aircraft name */}
       <div className="absolute left-3 top-14 flex flex-col gap-2">
         <div className="rounded-md border border-white/20 bg-black/40 px-2 py-0.5 font-mono text-[10px] text-cyan-300">
-          {snap.aircraftName}
+          {snap.aircraftName} {snap.gamepadConnected && <span className="text-emerald-400">🎮</span>}
         </div>
         <Panel title="Speed" value={String(speedKmh)} unit="km/h" />
         <Panel title="AoA" value={aoa} unit="°" sub={`β ${s.sideslip.toFixed(0)}°`} warn={stallNear} />

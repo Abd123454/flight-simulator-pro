@@ -52,12 +52,38 @@ export class Environment {
     this.hemi = new THREE.HemisphereLight(0xbfe3ff, 0x4a6a3a, 0.55)
     this.group.add(this.hemi)
 
-    // --- Terrain (huge flat plane, grass) ---
-    const terrainGeo = new THREE.PlaneGeometry(20000, 20000, 1, 1)
+    // --- Terrain (heightmap with procedural Perlin noise hills) ---
+    // Subdivided plane with vertices displaced by layered noise for hills/valleys.
+    // Flat near the airport (z within ±1700) so the runway stays level.
+    const terrainSize = 20000
+    const terrainSegs = 128 // 128x128 = 16K verts, single draw call
+    const terrainGeo = new THREE.PlaneGeometry(terrainSize, terrainSize, terrainSegs, terrainSegs)
     terrainGeo.rotateX(-Math.PI / 2)
+    // displace vertices with noise
+    const pos = terrainGeo.attributes.position
+    const flatZone = 1800 // keep flat within this distance of airport center
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i)
+      const z = pos.getZ(i)
+      const distFromCenter = Math.hypot(x, z)
+      // distance from the runway strip (along Z, x near 0)
+      const distFromRunway = Math.max(Math.abs(x) - 60, 0) // 60m runway half-width
+      const runwayProximity = Math.max(Math.abs(z) - 1600, 0) // flat along runway
+      const flatDist = Math.max(distFromRunway, runwayProximity)
+      // noise: layered octaves for natural-looking hills
+      let h = 0
+      h += this.noise2D(x * 0.0008, z * 0.0008) * 120 // large hills
+      h += this.noise2D(x * 0.003, z * 0.003) * 40 // medium
+      h += this.noise2D(x * 0.01, z * 0.01) * 12 // small detail
+      // flatten near airport (smooth transition)
+      const flatten = THREE.MathUtils.clamp(flatDist / 500, 0, 1)
+      h *= flatten
+      pos.setY(i, h)
+    }
+    terrainGeo.computeVertexNormals()
     const grass = makeGrassTexture()
     grass.wrapS = grass.wrapT = THREE.RepeatWrapping
-    grass.repeat.set(160, 160)
+    grass.repeat.set(100, 100)
     const terrainMat = new THREE.MeshStandardMaterial({
       map: grass,
       roughness: 1,
@@ -84,6 +110,29 @@ export class Environment {
   followTarget(pos: THREE.Vector3) {
     this.sun.target.position.copy(pos)
     this.sun.position.set(pos.x + 600, pos.y + 1200, pos.z - 400)
+  }
+
+  /** Simple value noise (Perlin-like) for procedural terrain. Deterministic. */
+  private noise2D(x: number, y: number): number {
+    // hash-based value noise with smooth interpolation
+    const xi = Math.floor(x)
+    const yi = Math.floor(y)
+    const xf = x - xi
+    const yf = y - yi
+    // smoothstep for interpolation
+    const u = xf * xf * (3 - 2 * xf)
+    const v = yf * yf * (3 - 2 * yf)
+    // hash function (deterministic pseudo-random)
+    const hash = (a: number, b: number) => {
+      const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453
+      return s - Math.floor(s) // 0..1
+    }
+    const a = hash(xi, yi)
+    const b = hash(xi + 1, yi)
+    const c = hash(xi, yi + 1)
+    const d = hash(xi + 1, yi + 1)
+    // bilinear interpolation
+    return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v - 0.5 // -0.5..0.5
   }
 
   private buildClouds() {

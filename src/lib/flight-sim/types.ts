@@ -13,6 +13,7 @@ export interface FlightControls {
   yaw: number // -1 (left) .. +1 (right)
   throttle: number // 0..1 (target throttle set by Shift/Ctrl)
   brake: boolean
+  gamepadThrottle?: number // -1..1 from gamepad triggers (optional)
 }
 
 export interface FlightState {
