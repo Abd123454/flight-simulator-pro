@@ -160,13 +160,6 @@ export const CAMPAIGN: CampaignNode[] = [
   { missionKey: 'storm', requires: ['combat', 'crosscountry'], stars: 3 },
 ]
 
-/** Check which campaign missions are unlocked given completed mission keys. */
-export function getUnlockedMissions(completed: Set<string>): string[] {
-  return CAMPAIGN.filter((node) =>
-    node.requires.every((req) => completed.has(req))
-  ).map((node) => node.missionKey)
-}
-
 export function createMissionState(mission: MissionConfig): MissionConfig {
   return {
     ...mission,

@@ -662,6 +662,13 @@ export class FlightEngine {
     this.liveWeatherSource = source
   }
 
+  /** Apply a fetched live elevation grid to the terrain (rebuilds terrain).
+   * Called after fetchLiveElevation() resolves, before mission start. */
+  applyLiveElevation(grid: number[], size = 5) {
+    this.env.setElevationGrid(grid, size)
+    this.env.rebuildTerrain()
+  }
+
   resize() {
     const w = this.container.clientWidth || 1280
     const h = this.container.clientHeight || 720

@@ -43,9 +43,9 @@ Missions unlock sequentially as you complete them:
 - Auto-disengages on manual pilot input
 
 ### Procedural Terrain
-- 128×128 heightmap (single draw call)
+- 128×128 heightmap (16,641 vertices, 32,768 triangles, single draw call)
 - Layered value noise for hills/valleys
-- **Real elevation profile**: distant terrain is biased by a real fetched elevation grid (Denver Intl area, via Open-Elevation API) — not pure arbitrary noise
+- **Dynamic real elevation**: when the player picks a live-weather airport, a real 5×5 elevation grid for that location is fetched (Open-Elevation API) and used to bias the terrain — picking a different airport changes the terrain profile. Default (no live weather) uses a Denver-area grid.
 - Flat zone near airports so runways stay level
 
 ### Two Airports

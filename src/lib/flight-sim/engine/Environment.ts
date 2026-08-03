@@ -13,11 +13,28 @@ export class Environment {
   private fogColor: THREE.Color | null = null
   private rainPoints: THREE.Points | null = null
   private rainVelocities: Float32Array | null = null
+  // elevation grid used to bias terrain (5×5, settable via setElevationGrid)
+  private elevationGrid: number[] = []
+  private elevationGridSize = 5
+  // terrain mesh reference (so we can rebuild it when elevation grid changes)
+  private terrainMesh: THREE.Mesh | null = null
+  private terrainSize = 20000
+  private terrainSegs = 128 // 128x128 = 16,641 verts, single draw call
 
   constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
     this.scene = scene
     this.group = new THREE.Group()
     scene.add(this.group)
+
+    // default elevation grid (Denver) — can be overridden by setElevationGrid
+    // before buildTerrain() is called, or swapped later to rebuild terrain.
+    this.elevationGrid = [
+      1635, 1631, 1646, 1630, 1627,
+      1619, 1629, 1643, 1626, 1621,
+      1606, 1635, 1640, 1627, 1618,
+      1600, 1635, 1634, 1627, 1612,
+      1612, 1626, 1613, 1619, 1606,
+    ]
 
     // --- Sky ---
     this.sky = new Sky()
@@ -59,79 +76,9 @@ export class Environment {
     this.group.add(this.hemi)
 
     // --- Terrain (heightmap with procedural noise + real elevation profile) ---
-    // Subdivided plane with vertices displaced by layered noise for hills/valleys.
-    // Flat near the airport (z within ±1700) so the runway stays level.
-    // The noise amplitude is biased by a real fetched elevation grid (Denver
-    // Intl area, KDEN) so distant hills follow a real-world terrain profile
-    // rather than arbitrary noise. Source: Open-Elevation API, fetched
-    // 2026-08-04, 5×5 grid around 39.86°N, 104.67°W.
-    const terrainSize = 20000
-    const terrainSegs = 128 // 128x128 = 16K verts, single draw call
-    const terrainGeo = new THREE.PlaneGeometry(terrainSize, terrainSize, terrainSegs, terrainSegs)
-    terrainGeo.rotateX(-Math.PI / 2)
-    // Real elevation grid (Denver area, meters). 5×5, row-major.
-    // Fetched from https://api.open-elevation.com on 2026-08-04.
-    // Values range 1600-1646m; we use the *variation* (offset from mean) to
-    // bias hill height, not the absolute elevation (the airport sits at 0).
-    const realElevations = [
-      1635, 1631, 1646, 1630, 1627,
-      1619, 1629, 1643, 1626, 1621,
-      1606, 1635, 1640, 1627, 1618,
-      1600, 1635, 1634, 1627, 1612,
-      1612, 1626, 1613, 1619, 1606,
-    ]
-    const meanElev = realElevations.reduce((a, b) => a + b, 0) / realElevations.length
-    const elevGridSize = 5
-    // sample the elevation grid bilinearly by world position (normalized -1..1)
-    const sampleElevation = (wx: number, wz: number): number => {
-      const u = THREE.MathUtils.clamp((wx / terrainSize) + 0.5, 0, 0.999)
-      const v = THREE.MathUtils.clamp((wz / terrainSize) + 0.5, 0, 0.999)
-      const fx = u * (elevGridSize - 1)
-      const fy = v * (elevGridSize - 1)
-      const ix = Math.floor(fx)
-      const iy = Math.floor(fy)
-      const tx = fx - ix
-      const ty = fy - iy
-      const a = realElevations[iy * elevGridSize + ix]
-      const b = realElevations[iy * elevGridSize + (ix + 1)]
-      const c = realElevations[(iy + 1) * elevGridSize + ix]
-      const d = realElevations[(iy + 1) * elevGridSize + (ix + 1)]
-      const elev = (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty
-      return elev - meanElev // deviation from mean (-23..+18m)
-    }
-    const pos = terrainGeo.attributes.position
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i)
-      const z = pos.getZ(i)
-      // distance from the runway strip (along Z, x near 0)
-      const distFromRunway = Math.max(Math.abs(x) - 60, 0) // 60m runway half-width
-      const runwayProximity = Math.max(Math.abs(z) - 1600, 0) // flat along runway
-      const flatDist = Math.max(distFromRunway, runwayProximity)
-      // noise: layered octaves for natural-looking hills
-      let h = 0
-      h += this.noise2D(x * 0.0008, z * 0.0008) * 120 // large hills
-      h += this.noise2D(x * 0.003, z * 0.003) * 40 // medium
-      h += this.noise2D(x * 0.01, z * 0.01) * 12 // small detail
-      // bias by real elevation deviation (scaled up so it's visible)
-      h += sampleElevation(x, z) * 6
-      // flatten near airport (smooth transition)
-      const flatten = THREE.MathUtils.clamp(flatDist / 500, 0, 1)
-      h *= flatten
-      pos.setY(i, h)
-    }
-    terrainGeo.computeVertexNormals()
-    const grass = makeGrassTexture()
-    grass.wrapS = grass.wrapT = THREE.RepeatWrapping
-    grass.repeat.set(100, 100)
-    const terrainMat = new THREE.MeshStandardMaterial({
-      map: grass,
-      roughness: 1,
-      metalness: 0,
-    })
-    const terrain = new THREE.Mesh(terrainGeo, terrainMat)
-    terrain.receiveShadow = true
-    terrain.position.y = 0
-    this.group.add(terrain)
+    // Built from this.elevationGrid (Denver default, overridable via
+    // setElevationGrid before this runs).
+    this.buildTerrain()
 
     // distant ground haze ring (a big dark-green disc below fog) handled by fog color
 
@@ -148,6 +95,78 @@ export class Environment {
     this.fog = scene.fog as THREE.Fog
 
     // keep sun shadow camera following handled externally if needed
+  }
+
+  /** Set the elevation grid used for terrain biasing (5×5, row-major).
+   * Call before the scene is built, or call rebuildTerrain() after. */
+  setElevationGrid(grid: number[], size = 5) {
+    this.elevationGrid = grid.length === size * size ? grid : this.elevationGrid
+    this.elevationGridSize = size
+  }
+
+  /** Rebuild the terrain mesh from the current elevation grid.
+   * Used when the player picks a different live-weather airport. */
+  rebuildTerrain() {
+    if (this.terrainMesh) {
+      this.group.remove(this.terrainMesh)
+      this.terrainMesh.geometry.dispose()
+      ;(this.terrainMesh.material as THREE.Material).dispose()
+      this.terrainMesh = null
+    }
+    this.buildTerrain()
+  }
+
+  /** Build (or rebuild) the terrain mesh from this.elevationGrid. */
+  private buildTerrain() {
+    const terrainGeo = new THREE.PlaneGeometry(this.terrainSize, this.terrainSize, this.terrainSegs, this.terrainSegs)
+    terrainGeo.rotateX(-Math.PI / 2)
+    // sample the elevation grid bilinearly by world position
+    const grid = this.elevationGrid
+    const gs = this.elevationGridSize
+    const meanElev = grid.length > 0 ? grid.reduce((a, b) => a + b, 0) / grid.length : 0
+    const sampleElevation = (wx: number, wz: number): number => {
+      if (grid.length === 0) return 0
+      const u = THREE.MathUtils.clamp((wx / this.terrainSize) + 0.5, 0, 0.999)
+      const v = THREE.MathUtils.clamp((wz / this.terrainSize) + 0.5, 0, 0.999)
+      const fx = u * (gs - 1)
+      const fy = v * (gs - 1)
+      const ix = Math.floor(fx)
+      const iy = Math.floor(fy)
+      const tx = fx - ix
+      const ty = fy - iy
+      const a = grid[iy * gs + ix]
+      const b = grid[iy * gs + (ix + 1)]
+      const c = grid[(iy + 1) * gs + ix]
+      const d = grid[(iy + 1) * gs + (ix + 1)]
+      const elev = (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty
+      return elev - meanElev
+    }
+    const pos = terrainGeo.attributes.position
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i)
+      const z = pos.getZ(i)
+      const distFromRunway = Math.max(Math.abs(x) - 60, 0)
+      const runwayProximity = Math.max(Math.abs(z) - 1600, 0)
+      const flatDist = Math.max(distFromRunway, runwayProximity)
+      let h = 0
+      h += this.noise2D(x * 0.0008, z * 0.0008) * 120
+      h += this.noise2D(x * 0.003, z * 0.003) * 40
+      h += this.noise2D(x * 0.01, z * 0.01) * 12
+      h += sampleElevation(x, z) * 6
+      const flatten = THREE.MathUtils.clamp(flatDist / 500, 0, 1)
+      h *= flatten
+      pos.setY(i, h)
+    }
+    terrainGeo.computeVertexNormals()
+    const grass = makeGrassTexture()
+    grass.wrapS = grass.wrapT = THREE.RepeatWrapping
+    grass.repeat.set(100, 100)
+    const terrainMat = new THREE.MeshStandardMaterial({ map: grass, roughness: 1, metalness: 0 })
+    const terrain = new THREE.Mesh(terrainGeo, terrainMat)
+    terrain.receiveShadow = true
+    terrain.position.y = 0
+    this.terrainMesh = terrain
+    this.group.add(terrain)
   }
 
   /** Update weather visuals (fog density, rain visibility) based on Weather. */

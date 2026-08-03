@@ -3,10 +3,10 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { AIRCRAFT_LIST, type AircraftType } from '@/lib/flight-sim/aircraft-config'
 import { MISSIONS, CAMPAIGN, type MissionConfig } from '@/lib/flight-sim/missions'
-import { LIVE_AIRPORTS, fetchLiveWeather, type LiveWeatherData } from '@/lib/flight-sim/live-weather'
+import { LIVE_AIRPORTS, fetchLiveWeather, fetchLiveElevation, type LiveWeatherData, type LiveElevationData } from '@/lib/flight-sim/live-weather'
 
 interface Props {
-  onSelect: (aircraft: AircraftType, missionKey: string, liveWeather?: LiveWeatherData) => void
+  onSelect: (aircraft: AircraftType, missionKey: string, liveWeather?: LiveWeatherData, liveElevation?: LiveElevationData) => void
   onBack: () => void
   completedMissions: string[]
 }
@@ -48,6 +48,7 @@ export function AircraftSelect({ onSelect, onBack, completedMissions }: Props) {
   const [selectedMissionKey, setSelectedMissionKey] = useState<string>('freeflight')
   const [liveAirportIcao, setLiveAirportIcao] = useState<string>('')
   const [liveWeather, setLiveWeather] = useState<LiveWeatherData | null>(null)
+  const [liveElevation, setLiveElevation] = useState<LiveElevationData | null>(null)
   const [liveStatus, setLiveStatus] = useState<string>('')
 
   const aircraft = AIRCRAFT_LIST.find((a) => a.type === selectedAircraft)!
@@ -55,19 +56,31 @@ export function AircraftSelect({ onSelect, onBack, completedMissions }: Props) {
   const completedSet = new Set(completedMissions)
 
   async function handleFetchLiveWeather(icao: string) {
-    setLiveStatus('Fetching...')
+    setLiveStatus('Fetching weather + elevation...')
     const airport = LIVE_AIRPORTS.find((a) => a.icao === icao)
     if (!airport) {
       setLiveStatus('Unknown airport')
       return
     }
-    const data = await fetchLiveWeather(airport)
-    if (data) {
-      setLiveWeather(data)
-      setLiveStatus(`✓ ${airport.icao}: ${Math.round(data.windDirection)}° @ ${(data.windSpeed * 3.6).toFixed(1)} km/h, vis ${(data.visibility / 1000).toFixed(1)}km`)
+    // fetch both in parallel
+    const [weather, elevation] = await Promise.all([
+      fetchLiveWeather(airport),
+      fetchLiveElevation(airport),
+    ])
+    if (weather) {
+      setLiveWeather(weather)
+      const elevRange = elevation
+        ? `${Math.min(...elevation.grid)}-${Math.max(...elevation.grid)}m`
+        : 'default'
+      setLiveStatus(`✓ ${airport.icao}: ${Math.round(weather.windDirection)}° @ ${(weather.windSpeed * 3.6).toFixed(1)} km/h, vis ${(weather.visibility / 1000).toFixed(1)}km, terrain ${elevRange}`)
     } else {
       setLiveWeather(null)
-      setLiveStatus(`✗ Failed to fetch ${airport.icao} (offline or rate-limited) — will use procedural weather`)
+      setLiveStatus(`✗ Failed to fetch ${airport.icao} (offline or rate-limited) — will use procedural weather + default terrain`)
+    }
+    if (elevation) {
+      setLiveElevation(elevation)
+    } else {
+      setLiveElevation(null)
     }
   }
 
@@ -200,7 +213,8 @@ export function AircraftSelect({ onSelect, onBack, completedMissions }: Props) {
             onClick={() => {
               setLiveAirportIcao('')
               setLiveWeather(null)
-              setLiveStatus('(procedural weather)')
+              setLiveElevation(null)
+              setLiveStatus('(procedural weather + default terrain)')
             }}
             className="rounded border border-white/15 px-2 py-1 text-[10px] font-mono text-white/50 hover:border-white/30"
           >
@@ -216,7 +230,7 @@ export function AircraftSelect({ onSelect, onBack, completedMissions }: Props) {
       <div className="flex justify-center">
         <Button
           size="lg"
-          onClick={() => onSelect(selectedAircraft, selectedMissionKey, liveWeather ?? undefined)}
+          onClick={() => onSelect(selectedAircraft, selectedMissionKey, liveWeather ?? undefined, liveElevation ?? undefined)}
           className="w-64 bg-cyan-500 text-lg font-bold text-slate-950 hover:bg-cyan-400"
         >
           Launch Mission →

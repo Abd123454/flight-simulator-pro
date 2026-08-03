@@ -31,6 +31,8 @@ export class WeatherSystem {
   private gustTimer = 0
   private gustStrength = 0 // current gust impulse 0..1
   private gustActive = false
+  // when true, update() must NOT overwrite visibility (live weather owns it)
+  private liveVisibilityLocked = false
 
   setWind(speed: number, dir: number) {
     this.baseSpeed = speed
@@ -39,6 +41,8 @@ export class WeatherSystem {
 
   setCondition(c: WeatherCondition) {
     this.weather.condition = c
+    // manual condition change unlocks visibility (procedural mode resumes)
+    this.liveVisibilityLocked = false
     switch (c) {
       case 'clear':
         this.weather.fogDensity = 0
@@ -69,6 +73,7 @@ export class WeatherSystem {
   setLiveWeather(windSpeed: number, windDir: number, visibility: number) {
     this.baseSpeed = windSpeed
     this.baseDir = windDir
+    this.liveVisibilityLocked = true // lock visibility to the live value
     // clamp visibility into a sensible range for the sim
     this.weather.visibility = Math.max(500, Math.min(visibility, 12000))
     // pick a condition based on visibility (rough mapping)
@@ -126,12 +131,15 @@ export class WeatherSystem {
     this.weather.windSpeed = speedVar
     this.weather.windDir = ((dirVar % 360) + 360) % 360
 
-    // visibility fluctuates slightly with fog
-    const baseVis = this.weather.condition === 'clear' ? 8000
-      : this.weather.condition === 'cloudy' ? 5000
-      : this.weather.condition === 'rain' ? 3000
-      : 1500
-    this.weather.visibility = baseVis * (0.8 + 0.2 * Math.sin(this.t * 0.1))
+    // visibility fluctuates slightly with fog — but only if not using live
+    // weather (live weather sets visibility directly and we must not overwrite).
+    if (!this.liveVisibilityLocked) {
+      const baseVis = this.weather.condition === 'clear' ? 8000
+        : this.weather.condition === 'cloudy' ? 5000
+        : this.weather.condition === 'rain' ? 3000
+        : 1500
+      this.weather.visibility = baseVis * (0.8 + 0.2 * Math.sin(this.t * 0.1))
+    }
   }
 
   /** Is a gust currently active? (for HUD indicator + audio) */

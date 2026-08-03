@@ -161,6 +161,8 @@ export function Hud({ snap, cameraMode }: Props) {
             <div>FPS: {Math.round(snap.fps)}</div>
             <div>Draws: {snap.drawCalls}</div>
             <div>Tris: {snap.triangles.toLocaleString()}</div>
+            <div>Geos: {snap.geomMemory}</div>
+            <div>Texs: {snap.texMemory}</div>
             <div>Wind: {snap.windSpeed.toFixed(0)}m/s {windCardinal}</div>
           </div>
         )}
