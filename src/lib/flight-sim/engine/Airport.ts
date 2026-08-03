@@ -115,7 +115,63 @@ export class Airport {
     this.buildPAPI(20, 0, -1440, -1) // approach from south (facing north threshold)
     this.buildPAPI(20, 0, 1440, 1) // approach from north (facing south threshold)
 
+    // ---------- Second airport: Northfield (5km north, for cross-country) ----------
+    this.buildNorthfield()
+
     this.group.add(this.windsock)
+  }
+
+  /** Simplified second airport at z=-5500 (Northfield). */
+  private buildNorthfield() {
+    const offsetX = 0
+    const offsetZ = -5500
+    // runway (shorter, 2000m)
+    const runwayTex = makeRunwayTexture()
+    const rwyGeo = new THREE.PlaneGeometry(45, 2000)
+    rwyGeo.rotateX(-Math.PI / 2)
+    const rwy = new THREE.Mesh(
+      rwyGeo,
+      new THREE.MeshStandardMaterial({ map: runwayTex, roughness: 0.95 })
+    )
+    rwy.position.set(offsetX, 0.02, offsetZ)
+    rwy.receiveShadow = true
+    this.group.add(rwy)
+    // small terminal
+    const term = new THREE.Mesh(
+      new THREE.BoxGeometry(30, 12, 80),
+      new THREE.MeshStandardMaterial({ color: 0xc0c4c8, roughness: 0.7 })
+    )
+    term.position.set(offsetX + 80, 6, offsetZ)
+    term.castShadow = true
+    this.group.add(term)
+    // control tower (small)
+    const shaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(2, 2.5, 20, 8),
+      new THREE.MeshStandardMaterial({ color: 0xc8ccd0, roughness: 0.7 })
+    )
+    shaft.position.set(offsetX - 60, 10, offsetZ + 200)
+    shaft.castShadow = true
+    this.group.add(shaft)
+    const cab = new THREE.Mesh(
+      new THREE.CylinderGeometry(4, 3, 4, 8),
+      new THREE.MeshStandardMaterial({ color: 0x1f2a33, roughness: 0.2, metalness: 0.5 })
+    )
+    cab.position.set(offsetX - 60, 22, offsetZ + 200)
+    this.group.add(cab)
+    // runway edge lights (instanced, simplified)
+    const edgeLights: THREE.Vector3[] = []
+    for (let z = -1000; z <= 1000; z += 100) {
+      edgeLights.push(new THREE.Vector3(offsetX - 23, 0.5, offsetZ + z))
+      edgeLights.push(new THREE.Vector3(offsetX + 23, 0.5, offsetZ + z))
+    }
+    this.group.add(instancedSpheres(edgeLights, 0xffffff, 0xffffcc, 0.4))
+    // threshold lights (green)
+    const thrLights: THREE.Vector3[] = []
+    for (let i = -3; i <= 3; i++) {
+      thrLights.push(new THREE.Vector3(offsetX + i * 6, 0.5, offsetZ - 1000))
+      thrLights.push(new THREE.Vector3(offsetX + i * 6, 0.5, offsetZ + 1000))
+    }
+    this.group.add(instancedSpheres(thrLights, 0x20ff40, 0x10aa20, 0.4))
   }
 
   private buildPAPI(x: number, y: number, z: number, dir: number) {

@@ -99,6 +99,7 @@ export function FlightSimulator() {
           maxAltitude: maxAltRef.current,
           landingVS: engine.state.landingVerticalSpeed,
           missionType: engine.mission.type,
+          missionKey: selectedMissionKey,
           weatherCondition: lastWeatherRef.current,
         })
         setProgress(currentProgress)
@@ -160,7 +161,13 @@ export function FlightSimulator() {
   }
 
   if (screen === 'select') {
-    return <AircraftSelect onSelect={handleAircraftSelect} onBack={() => setScreen('menu')} />
+    return (
+      <AircraftSelect
+        onSelect={handleAircraftSelect}
+        onBack={() => setScreen('menu')}
+        completedMissions={progress.completedMissions}
+      />
+    )
   }
 
   if (screen === 'achievements') {

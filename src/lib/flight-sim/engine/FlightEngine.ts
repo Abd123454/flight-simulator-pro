@@ -255,6 +255,12 @@ export class FlightEngine {
     this.missionStartTime = performance.now()
     this.missionElapsed = 0
     this.lastTime = performance.now()
+    // storm mission: force storm weather
+    if (this.mission.type === 'storm') {
+      this.weather.setCondition('storm')
+    } else {
+      this.weather.setCondition('clear')
+    }
     this.onPhaseChange?.(this.phase, this.result)
   }
 

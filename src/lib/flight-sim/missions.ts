@@ -1,7 +1,7 @@
 // Mission system — inspired by Ace Combat missions and MSFS challenges.
 // Mission types: free flight, waypoint race, landing challenge, target practice.
 
-export type MissionType = 'freeflight' | 'race' | 'landing' | 'combat'
+export type MissionType = 'freeflight' | 'race' | 'landing' | 'combat' | 'crosscountry' | 'storm'
 
 export interface Waypoint {
   id: number
@@ -102,12 +102,72 @@ export const MISSIONS: Record<string, MissionConfig> = {
     spawnHeading: 0,
     rewardXP: 400,
   },
+
+  // Cross-country: navigate from main airport to the north airport (5000m away)
+  crosscountry: {
+    type: 'crosscountry',
+    name: 'Cross Country',
+    description: 'Navigate 5km north to the second airport and land.',
+    brief: 'Fly north through the navigation waypoints to reach Northfield Airport, then land safely. Watch your fuel — manage throttle for the journey!',
+    waypoints: [
+      { id: 1, position: { x: 0, y: 500, z: 0 }, reached: false, radius: 100 },
+      { id: 2, position: { x: 0, y: 600, z: -1500 }, reached: false, radius: 100 },
+      { id: 3, position: { x: 0, y: 700, z: -3000 }, reached: false, radius: 100 },
+      { id: 4, position: { x: 0, y: 500, z: -4500 }, reached: false, radius: 100 },
+      { id: 5, position: { x: 0, y: 100, z: -5500 }, reached: false, radius: 80 },
+    ],
+    timeLimit: 300,
+    spawnPosition: { x: 0, y: 200, z: 1200 },
+    spawnHeading: 0,
+    rewardXP: 500,
+  },
+
+  // Storm flight: fly in severe weather conditions
+  storm: {
+    type: 'storm',
+    name: 'Storm Runner',
+    description: 'Fly through a severe storm to reach the emergency landing site.',
+    brief: 'A severe storm has hit the region. Visibility is dangerously low and gusts are strong. Navigate through the waypoints and land safely. Only for experienced pilots!',
+    waypoints: [
+      { id: 1, position: { x: 0, y: 300, z: 800 }, reached: false, radius: 80 },
+      { id: 2, position: { x: -200, y: 350, z: 0 }, reached: false, radius: 80 },
+      { id: 3, position: { x: 200, y: 400, z: -800 }, reached: false, radius: 80 },
+      { id: 4, position: { x: 0, y: 200, z: -1400 }, reached: false, radius: 80 },
+    ],
+    timeLimit: 200,
+    spawnPosition: { x: 0, y: 300, z: 1400 },
+    spawnHeading: 0,
+    rewardXP: 600,
+  },
 }
 
 export const MISSION_LIST = Object.values(MISSIONS)
 
+/** Campaign structure — missions unlock sequentially as you complete them.
+ * Free Flight is always available. */
+export interface CampaignNode {
+  missionKey: string
+  requires: string[] // mission keys that must be completed first
+  stars: number // difficulty (1-3)
+}
+
+export const CAMPAIGN: CampaignNode[] = [
+  { missionKey: 'freeflight', requires: [], stars: 0 },
+  { missionKey: 'landing', requires: ['freeflight'], stars: 1 },
+  { missionKey: 'race1', requires: ['freeflight'], stars: 1 },
+  { missionKey: 'crosscountry', requires: ['landing', 'race1'], stars: 2 },
+  { missionKey: 'combat', requires: ['crosscountry'], stars: 2 },
+  { missionKey: 'storm', requires: ['combat', 'crosscountry'], stars: 3 },
+]
+
+/** Check which campaign missions are unlocked given completed mission keys. */
+export function getUnlockedMissions(completed: Set<string>): string[] {
+  return CAMPAIGN.filter((node) =>
+    node.requires.every((req) => completed.has(req))
+  ).map((node) => node.missionKey)
+}
+
 export function createMissionState(mission: MissionConfig): MissionConfig {
-  // deep clone with fresh reached/destroyed flags
   return {
     ...mission,
     waypoints: mission.waypoints?.map((w) => ({ ...w, reached: false })),

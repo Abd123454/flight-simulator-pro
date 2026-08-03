@@ -2,11 +2,12 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { AIRCRAFT_LIST, type AircraftType } from '@/lib/flight-sim/aircraft-config'
-import { MISSIONS, MISSION_LIST, type MissionConfig } from '@/lib/flight-sim/missions'
+import { MISSIONS, CAMPAIGN, type MissionConfig } from '@/lib/flight-sim/missions'
 
 interface Props {
   onSelect: (aircraft: AircraftType, missionKey: string) => void
   onBack: () => void
+  completedMissions: string[]
 }
 
 function StatBar({ label, value, color }: { label: string; value: number; color: string }) {
@@ -37,14 +38,17 @@ const MISSION_ICONS: Record<string, string> = {
   race: '🏁',
   landing: '🛬',
   combat: '🎯',
+  crosscountry: '🧭',
+  storm: '⛈',
 }
 
-export function AircraftSelect({ onSelect, onBack }: Props) {
+export function AircraftSelect({ onSelect, onBack, completedMissions }: Props) {
   const [selectedAircraft, setSelectedAircraft] = useState<AircraftType>('airliner')
   const [selectedMissionKey, setSelectedMissionKey] = useState<string>('freeflight')
 
   const aircraft = AIRCRAFT_LIST.find((a) => a.type === selectedAircraft)!
   const mission = MISSIONS[selectedMissionKey]
+  const completedSet = new Set(completedMissions)
 
   return (
     <div className="absolute inset-0 z-20 flex flex-col overflow-y-auto bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-6">
@@ -91,24 +95,45 @@ export function AircraftSelect({ onSelect, onBack }: Props) {
         </div>
       </div>
 
-      {/* Mission selection */}
+      {/* Mission selection — campaign with unlocks */}
       <div className="mb-6">
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-white/70">Mission</h2>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {MISSION_LIST.map((m) => {
-            const key = Object.keys(MISSIONS).find((k) => MISSIONS[k] === m)!
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-white/70">
+          Campaign Missions
+        </h2>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          {CAMPAIGN.map((node) => {
+            const m = MISSIONS[node.missionKey]
+            if (!m) return null
+            const unlocked = node.requires.every((req) => completedSet.has(req))
+            const completed = completedSet.has(node.missionKey)
+            const isSelected = selectedMissionKey === node.missionKey
             return (
               <button
-                key={m.name}
-                onClick={() => setSelectedMissionKey(key)}
-                className={`rounded-lg border-2 p-3 text-left transition-all ${
-                  selectedMissionKey === key
-                    ? 'border-amber-400 bg-amber-950/30 shadow-[0_0_12px_rgba(251,191,36,0.3)]'
-                    : 'border-white/10 bg-black/30 hover:border-white/30'
+                key={node.missionKey}
+                disabled={!unlocked}
+                onClick={() => unlocked && setSelectedMissionKey(node.missionKey)}
+                className={`relative rounded-lg border-2 p-3 text-left transition-all ${
+                  !unlocked
+                    ? 'cursor-not-allowed border-white/5 bg-black/40 opacity-40'
+                    : isSelected
+                      ? 'border-amber-400 bg-amber-950/30 shadow-[0_0_12px_rgba(251,191,36,0.3)]'
+                      : 'border-white/10 bg-black/30 hover:border-white/30'
                 }`}
               >
+                {/* difficulty stars */}
+                <div className="absolute right-2 top-2 text-[9px] text-amber-400">
+                  {'★'.repeat(node.stars)}
+                </div>
+                {/* completion check */}
+                {completed && (
+                  <div className="absolute left-2 top-2 text-[10px] text-emerald-400">✓</div>
+                )}
+                {/* lock icon */}
+                {!unlocked && (
+                  <div className="absolute right-2 bottom-2 text-lg opacity-60">🔒</div>
+                )}
                 <div className="mb-1 flex items-center gap-2">
-                  <span className="text-lg">{MISSION_ICONS[m.type]}</span>
+                  <span className="text-lg">{MISSION_ICONS[m.type] || '✈'}</span>
                   <span className="text-sm font-bold text-white">{m.name}</span>
                 </div>
                 <div className="text-[10px] text-white/50">{m.description}</div>
