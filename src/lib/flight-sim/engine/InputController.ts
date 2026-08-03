@@ -13,6 +13,8 @@ export class InputController {
   private flapsDownQueued = false
   private spoilerToggleQueued = false
   private reverseToggleQueued = false
+  private weatherCycleQueued = false
+  private autopilotToggleQueued = false
   enabled = true
   sensitivity = 1
 
@@ -73,6 +75,11 @@ export class InputController {
     if (code === 'KeyB' || e.key === 'b' || e.key === 'B') this.spoilerToggleQueued = true
     // reverse thrust
     if (code === 'KeyX' || e.key === 'x' || e.key === 'X') this.reverseToggleQueued = true
+    // weather cycle (key 1-4 or W)
+    if (code === 'Digit1' || code === 'Digit2' || code === 'Digit3' || code === 'Digit4') {
+      this.weatherCycleQueued = true
+    }
+    if (code === 'KeyP' || e.key === 'p' || e.key === 'P') this.autopilotToggleQueued = true
   }
 
   private onKeyUp = (e: KeyboardEvent) => {
@@ -243,6 +250,16 @@ export class InputController {
   consumeReverseToggle() {
     const v = this.reverseToggleQueued
     this.reverseToggleQueued = false
+    return v
+  }
+  consumeWeatherCycle() {
+    const v = this.weatherCycleQueued
+    this.weatherCycleQueued = false
+    return v
+  }
+  consumeAutopilotToggle() {
+    const v = this.autopilotToggleQueued
+    this.autopilotToggleQueued = false
     return v
   }
 

@@ -122,6 +122,24 @@ export function Hud({ snap, cameraMode }: Props) {
               ×{snap.combo} COMBO
             </span>
           )}
+          {/* Weather indicator */}
+          <span className={`font-mono text-xs ${
+            snap.weatherCondition === 'storm' ? 'text-red-400' :
+            snap.weatherCondition === 'rain' ? 'text-blue-400' :
+            snap.weatherCondition === 'cloudy' ? 'text-slate-400' : 'text-yellow-400'
+          }`}>
+            {snap.weatherCondition === 'clear' ? '☀' :
+             snap.weatherCondition === 'cloudy' ? '☁' :
+             snap.weatherCondition === 'rain' ? '🌧' : '⛈'}
+            {' '}{snap.weatherCondition.toUpperCase()}
+            {snap.gustActive && <span className="text-orange-400 animate-pulse"> GUST!</span>}
+          </span>
+          {/* Autopilot indicator */}
+          {snap.autopilot && (
+            <span className="font-mono text-xs font-bold text-emerald-400 animate-pulse">
+              AP {Math.round(snap.autopilotHeading)}° / {Math.round(snap.autopilotAltitude)}m
+            </span>
+          )}
         </div>
       </div>
 
@@ -244,10 +262,11 @@ export function Hud({ snap, cameraMode }: Props) {
         <span className="text-cyan-300">W/S</span> pitch ·{' '}
         <span className="text-cyan-300">A/D</span> roll ·{' '}
         <span className="text-cyan-300">Shift/Ctrl</span> throttle ·{' '}
-        <span className="text-cyan-300">Space</span> brake ·{' '}
         <span className="text-cyan-300">G</span> gear ·{' '}
         <span className="text-cyan-300">F/V</span> flaps ·{' '}
         <span className="text-cyan-300">C</span> camera ·{' '}
+        <span className="text-cyan-300">1-4</span> weather ·{' '}
+        <span className="text-cyan-300">P</span> autopilot ·{' '}
         <span className="text-cyan-300">Esc</span> pause
       </div>
     </div>

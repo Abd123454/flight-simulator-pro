@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import type { FlightResult } from '@/lib/flight-sim/engine/FlightEngine'
+import type { Achievement } from '@/lib/flight-sim/achievements'
 
 interface MenuShellProps {
   children: React.ReactNode
@@ -35,11 +36,13 @@ interface Settings {
 export function MainMenu({
   onStart,
   onAircraftSelect,
+  onAchievements,
   muted,
   onToggleMute,
 }: {
   onStart: () => void
   onAircraftSelect: () => void
+  onAchievements: () => void
   muted: boolean
   onToggleMute: () => void
 }) {
@@ -61,21 +64,30 @@ export function MainMenu({
       </Button>
       <Button
         variant="outline"
+        onClick={onAchievements}
+        className="w-64 border-emerald-400/40 bg-emerald-950/20 text-emerald-200 hover:bg-emerald-900/30"
+      >
+        🏆 Achievements
+      </Button>
+      <Button
+        variant="outline"
         onClick={onToggleMute}
         className="w-64 border-white/20 bg-white/5 text-white hover:bg-white/10"
       >
         Sound: {muted ? 'Off' : 'On'}
       </Button>
       <div className="mt-6 max-w-md rounded-lg border border-white/10 bg-black/30 p-4 text-center text-xs leading-relaxed text-white/60">
-        <p className="mb-2 font-semibold text-cyan-300/90">4 Aircraft · 4 Mission Types</p>
+        <p className="mb-2 font-semibold text-cyan-300/90">4 Aircraft · 4 Mission Types · 10 Achievements</p>
         Fly the <span className="text-white/80">737 Airliner</span>, <span className="text-amber-300">F-16 Fighter</span> (with afterburner),
         <span className="text-red-300"> Extra 300 Stunt</span>, or <span className="text-green-300">C-130 Cargo</span>.
         Choose Free Flight, Canyon Sprint Race, Landing Challenge, or Target Practice.
+        Now with dynamic weather (clear/cloudy/rain/storm) and autopilot.
       </div>
       <div className="mt-3 max-w-md rounded-lg border border-amber-400/20 bg-amber-950/20 p-3 text-center text-[10px] leading-relaxed text-amber-200/60">
         <span className="font-mono">W/S</span> pitch · <span className="font-mono">A/D</span> roll ·{' '}
         <span className="font-mono">Shift</span> throttle · <span className="font-mono">G</span> gear ·{' '}
-        <span className="font-mono">F/V</span> flaps · <span className="font-mono">C</span> camera
+        <span className="font-mono">F/V</span> flaps · <span className="font-mono">1-4</span> weather ·{' '}
+        <span className="font-mono">P</span> autopilot · <span className="font-mono">C</span> camera
       </div>
     </MenuShell>
   )
@@ -148,6 +160,7 @@ export function EndScreen({
   landingVSpeed,
   landingSpeed,
   score,
+  newAchievements,
   onRestart,
   onQuit,
 }: {
@@ -157,6 +170,7 @@ export function EndScreen({
   landingVSpeed: number
   landingSpeed: number
   score: number
+  newAchievements?: Achievement[]
   onRestart: () => void
   onQuit: () => void
 }) {
@@ -178,6 +192,23 @@ export function EndScreen({
           {score.toLocaleString()}
         </div>
       </div>
+      {/* New achievements unlocked */}
+      {newAchievements && newAchievements.length > 0 && (
+        <div className="mb-3 rounded-lg border border-emerald-400/40 bg-emerald-950/30 p-3">
+          <div className="mb-2 text-center text-[10px] uppercase tracking-widest text-emerald-300">
+            🏆 Achievement Unlocked!
+          </div>
+          {newAchievements.map((a) => (
+            <div key={a.id} className="flex items-center gap-2">
+              <span className="text-2xl">{a.icon}</span>
+              <div>
+                <div className="font-bold text-emerald-200">{a.name}</div>
+                <div className="text-[10px] text-white/50">{a.description}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="mb-2 flex gap-6 font-mono text-sm text-white/80">
         <div>
           <div className="text-[10px] uppercase tracking-widest text-white/40">Flight Time</div>

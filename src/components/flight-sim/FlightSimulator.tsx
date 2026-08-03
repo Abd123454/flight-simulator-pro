@@ -4,11 +4,13 @@ import { FlightEngine, type HudSnapshot, type FlightResult } from '@/lib/flight-
 import type { CameraMode, GamePhase } from '@/lib/flight-sim/types'
 import { AIRCRAFT, type AircraftType } from '@/lib/flight-sim/aircraft-config'
 import { MISSIONS, createMissionState } from '@/lib/flight-sim/missions'
+import { loadProgress, recordMissionResult, type PlayerProgress, type Achievement } from '@/lib/flight-sim/achievements'
 import { Hud } from './Hud'
 import { MainMenu, PauseMenu, EndScreen } from './Menus'
 import { AircraftSelect } from './AircraftSelect'
+import { AchievementsScreen } from './AchievementsScreen'
 
-type Screen = 'menu' | 'select' | 'game'
+type Screen = 'menu' | 'select' | 'game' | 'achievements'
 
 interface Settings {
   sensitivity: number
@@ -21,6 +23,7 @@ export function FlightSimulator() {
   const engineRef = useRef<FlightEngine | null>(null)
   const maxAltRef = useRef(0)
   const lastHudUpdate = useRef(0)
+  const lastWeatherRef = useRef('clear')
 
   const [screen, setScreen] = useState<Screen>('menu')
   const [phase, setPhase] = useState<GamePhase>('menu')
@@ -33,6 +36,8 @@ export function FlightSimulator() {
   const [landingSpeed, setLandingSpeed] = useState(0)
   const [finalScore, setFinalScore] = useState(0)
   const [muted, setMuted] = useState(false)
+  const [newAchievements, setNewAchievements] = useState<Achievement[]>([])
+  const [progress, setProgress] = useState<PlayerProgress>(() => loadProgress())
 
   // selected aircraft + mission
   const [selectedAircraft, setSelectedAircraft] = useState<AircraftType>('airliner')
@@ -68,6 +73,7 @@ export function FlightSimulator() {
     engine.onState = (s) => {
       if (engine.phase === 'flying') {
         maxAltRef.current = Math.max(maxAltRef.current, s.state.altitude)
+        lastWeatherRef.current = s.weatherCondition
       }
       const now = performance.now()
       if (now - lastHudUpdate.current > 33) {
@@ -84,6 +90,19 @@ export function FlightSimulator() {
         setLandingVSpeed(engine.state.landingVerticalSpeed)
         setLandingSpeed(engine.state.landingSpeed)
         setFinalScore(engine.score)
+        // record to achievements
+        const currentProgress = loadProgress()
+        const newly = recordMissionResult(currentProgress, {
+          success: r === 'success',
+          score: engine.score,
+          flightTime: engine.state.flightTime,
+          maxAltitude: maxAltRef.current,
+          landingVS: engine.state.landingVerticalSpeed,
+          missionType: engine.mission.type,
+          weatherCondition: lastWeatherRef.current,
+        })
+        setProgress(currentProgress)
+        setNewAchievements(newly)
       }
       if (p === 'flying' && r === 'flying') {
         maxAltRef.current = engine.state.altitude
@@ -133,6 +152,7 @@ export function FlightSimulator() {
       <MainMenu
         onStart={handleStart}
         onAircraftSelect={() => setScreen('select')}
+        onAchievements={() => setScreen('achievements')}
         muted={muted}
         onToggleMute={handleToggleMute}
       />
@@ -141,6 +161,10 @@ export function FlightSimulator() {
 
   if (screen === 'select') {
     return <AircraftSelect onSelect={handleAircraftSelect} onBack={() => setScreen('menu')} />
+  }
+
+  if (screen === 'achievements') {
+    return <AchievementsScreen progress={progress} onBack={() => setScreen('menu')} />
   }
 
   // game screen
@@ -169,6 +193,7 @@ export function FlightSimulator() {
           landingVSpeed={landingVSpeed}
           landingSpeed={landingSpeed}
           score={finalScore}
+          newAchievements={newAchievements}
           onRestart={handleRestart}
           onQuit={handleQuit}
         />

@@ -8,8 +8,14 @@ export class Environment {
   sun: THREE.DirectionalLight
   hemi: THREE.HemisphereLight
   private sky: Sky
+  private scene: THREE.Scene
+  private fog: THREE.Fog | null = null
+  private fogColor: THREE.Color | null = null
+  private rainPoints: THREE.Points | null = null
+  private rainVelocities: Float32Array | null = null
 
   constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
+    this.scene = scene
     this.group = new THREE.Group()
     scene.add(this.group)
 
@@ -99,17 +105,108 @@ export class Environment {
     // --- Clouds (simple billboard puffs — cheap, no particles) ---
     this.buildClouds()
 
+    // --- Rain particle system (CPU particles, hidden by default) ---
+    this.buildRain()
+
     // --- Environment + fog ---
+    this.fogColor = new THREE.Color(0xcfe8f5)
     scene.background = new THREE.Color(0xbfe3ff)
     scene.fog = new THREE.Fog(0xcfe8f5, 2500, 9000)
+    this.fog = scene.fog as THREE.Fog
 
     // keep sun shadow camera following handled externally if needed
+  }
+
+  /** Update weather visuals (fog density, rain visibility) based on Weather. */
+  updateWeather(weather: { fogDensity: number; rainIntensity: number; visibility: number; condition: string }) {
+    // adjust fog near/far based on visibility
+    if (this.fog) {
+      this.fog.near = weather.visibility * 0.3
+      this.fog.far = weather.visibility
+      // darken fog color in storms
+      const targetColor = weather.condition === 'storm' ? 0x6b7785
+        : weather.condition === 'rain' ? 0x9aa5b0
+        : weather.condition === 'cloudy' ? 0xb8c5d0
+        : 0xcfe8f5
+      this.fog.color.setHex(targetColor)
+      ;(this.scene.background as THREE.Color).setHex(
+        weather.condition === 'storm' ? 0x4a5560
+        : weather.condition === 'rain' ? 0x8a95a0
+        : weather.condition === 'cloudy' ? 0xa8b8c8
+        : 0xbfe3ff
+      )
+      // dim the sun in bad weather
+      this.sun.intensity = weather.condition === 'storm' ? 0.4
+        : weather.condition === 'rain' ? 0.6
+        : weather.condition === 'cloudy' ? 0.8
+        : 1.25
+    }
+    // rain particles visibility
+    if (this.rainPoints) {
+      this.rainPoints.visible = weather.rainIntensity > 0.01
+      const mat = this.rainPoints.material as THREE.PointsMaterial
+      mat.opacity = weather.rainIntensity * 0.6
+    }
   }
 
   /** Move sun shadow camera to follow the airplane so shadows stay crisp. */
   followTarget(pos: THREE.Vector3) {
     this.sun.target.position.copy(pos)
     this.sun.position.set(pos.x + 600, pos.y + 1200, pos.z - 400)
+    // move rain to follow the airplane so it's always visible around the plane
+    if (this.rainPoints) {
+      this.rainPoints.position.set(pos.x, 0, pos.z)
+    }
+  }
+
+  private buildRain() {
+    // CPU-friendly rain: a Points cloud of ~800 droplets around the plane.
+    const count = 800
+    const geo = new THREE.BufferGeometry()
+    const positions = new Float32Array(count * 3)
+    const velocities = new Float32Array(count)
+    for (let i = 0; i < count; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 400 // x
+      positions[i * 3 + 1] = Math.random() * 300 // y (0..300)
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 400 // z
+      velocities[i] = 60 + Math.random() * 40 // fall speed m/s
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    this.rainVelocities = velocities
+    const mat = new THREE.PointsMaterial({
+      color: 0xaaccee,
+      size: 1.5,
+      transparent: true,
+      opacity: 0,
+      sizeAttenuation: true,
+    })
+    this.rainPoints = new THREE.Points(geo, mat)
+    this.rainPoints.visible = false
+    this.rainPoints.frustumCulled = false // always render (follows plane)
+    this.group.add(this.rainPoints)
+  }
+
+  /** Animate rain droplets (call each frame). */
+  updateRain(dt: number, windX: number, windZ: number) {
+    if (!this.rainPoints || !this.rainPoints.visible) return
+    const pos = this.rainPoints.geometry.attributes.position as THREE.BufferAttribute
+    const arr = pos.array as Float32Array
+    const windOffsetX = windX * dt * 0.3
+    const windOffsetZ = windZ * dt * 0.3
+    for (let i = 0; i < this.rainVelocities.length; i++) {
+      // fall down
+      arr[i * 3 + 1] -= this.rainVelocities[i] * dt
+      // drift with wind
+      arr[i * 3] += windOffsetX
+      arr[i * 3 + 2] += windOffsetZ
+      // recycle when below ground
+      if (arr[i * 3 + 1] < 0) {
+        arr[i * 3 + 1] = 300
+        arr[i * 3] = (Math.random() - 0.5) * 400
+        arr[i * 3 + 2] = (Math.random() - 0.5) * 400
+      }
+    }
+    pos.needsUpdate = true
   }
 
   /** Simple value noise (Perlin-like) for procedural terrain. Deterministic. */

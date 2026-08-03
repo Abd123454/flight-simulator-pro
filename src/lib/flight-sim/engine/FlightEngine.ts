@@ -42,6 +42,11 @@ export interface HudSnapshot {
   afterburner: boolean
   aircraftName: string
   gamepadConnected: boolean
+  autopilot: boolean
+  autopilotHeading: number
+  autopilotAltitude: number
+  weatherCondition: string
+  gustActive: boolean
 }
 
 export type FlightResult = 'none' | 'flying' | 'success' | 'crash'
@@ -73,6 +78,11 @@ export class FlightEngine {
   comboTimer = 0
   missionStartTime = 0
   missionElapsed = 0
+
+  // autopilot
+  autopilot = false
+  autopilotHeading = 0 // degrees, target heading
+  autopilotAltitude = 1000 // meters, target altitude
 
   // waypoint/target visuals
   private waypointMeshes: { mesh: THREE.Group; wp: Waypoint }[] = []
@@ -325,14 +335,59 @@ export class FlightEngine {
       }
       if (!this.state.onGround) this.state.reverseThrust = false
 
+      // weather cycle (keys 1-4)
+      if (this.input.consumeWeatherCycle()) {
+        const conds = ['clear', 'cloudy', 'rain', 'storm'] as const
+        const idx = conds.indexOf(this.weather.weather.condition as any)
+        const next = conds[(idx + 1) % conds.length]
+        this.weather.setCondition(next)
+      }
+      // autopilot toggle (P)
+      if (this.input.consumeAutopilotToggle()) {
+        if (!this.autopilot && !this.state.onGround) {
+          // engage: capture current heading + altitude
+          this.autopilot = true
+          this.autopilotHeading = this.state.heading
+          this.autopilotAltitude = Math.max(100, this.state.altitude)
+        } else {
+          this.autopilot = false
+        }
+      }
+
       // physics
       this.accumulator += dt
       if (this.accumulator > 0.5) this.accumulator = 0.5
       let steps = 0
       const wasCrashed = this.state.crashed
+
+      // Autopilot: override controls to hold heading + altitude.
+      // Disables if the pilot provides manual input.
+      let apControls = controls
+      if (this.autopilot && !this.state.onGround) {
+        const pilotInput = Math.abs(controls.pitch) > 0.1 || Math.abs(controls.roll) > 0.1
+        if (pilotInput) {
+          // pilot override → disengage autopilot
+          this.autopilot = false
+        } else {
+          // heading hold: bank toward target heading
+          let hdgErr = this.autopilotHeading - this.state.heading
+          if (hdgErr > 180) hdgErr -= 360
+          if (hdgErr < -180) hdgErr += 360
+          const targetRoll = THREE.MathUtils.clamp(hdgErr * 0.02, -0.4, 0.4) // bank up to ~23°
+          // altitude hold: pitch toward target altitude
+          const altErr = this.autopilotAltitude - this.state.altitude
+          const targetPitch = THREE.MathUtils.clamp(-altErr * 0.005, -0.3, 0.3) // pitch up if below
+          apControls = {
+            ...controls,
+            roll: targetRoll,
+            pitch: targetPitch,
+          }
+        }
+      }
+
       while (this.accumulator >= STEP && steps < 30) {
         try {
-          stepFlight(this.state, this.orientation, controls, STEP, this.weather.weather)
+          stepFlight(this.state, this.orientation, apControls, STEP, this.weather.weather)
         } catch (err) {
           console.error('[FlightSim] physics error:', err)
           this.accumulator = 0
@@ -352,6 +407,9 @@ export class FlightEngine {
       this.airplane.update(this.state, dt, this.afterburner)
       this.airport.update(dt, this.weather.weather)
       this.weather.update(dt)
+      // update weather visuals (fog, rain)
+      this.env.updateWeather(this.weather.weather)
+      this.env.updateRain(dt, this.weather.weather.windX, this.weather.weather.windZ)
 
       // combo decay
       if (this.combo > 0) {
@@ -435,6 +493,11 @@ export class FlightEngine {
         afterburner: this.afterburner,
         aircraftName: this.aircraftConfig.name,
         gamepadConnected: this.input.isGamepadConnected(),
+        autopilot: this.autopilot,
+        autopilotHeading: this.autopilotHeading,
+        autopilotAltitude: this.autopilotAltitude,
+        weatherCondition: this.weather.weather.condition,
+        gustActive: this.weather.isGustActive(),
       })
     }
   }
