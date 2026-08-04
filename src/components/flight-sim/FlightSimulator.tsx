@@ -12,9 +12,11 @@ import { MainMenu, PauseMenu, EndScreen } from './Menus'
 import { AircraftSelect } from './AircraftSelect'
 import { AchievementsScreen } from './AchievementsScreen'
 import { DailyFlightScreen } from './DailyFlightScreen'
+import { StemScreen } from './StemScreen'
 import type { DailyFlightConfig } from '@/lib/flight-sim/daily-flight'
+import type { StemLesson } from '@/lib/flight-sim/stem-lessons'
 
-type Screen = 'menu' | 'select' | 'game' | 'achievements' | 'daily'
+type Screen = 'menu' | 'select' | 'game' | 'achievements' | 'daily' | 'stem'
 
 interface Settings {
   sensitivity: number
@@ -152,7 +154,6 @@ export function FlightSimulator() {
   const handleDailyFlight = async (config: DailyFlightConfig) => {
     setSelectedAircraft(config.aircraftType as AircraftType)
     setSelectedMissionKey(config.missionType)
-    // Fetch live weather for the daily airport
     const airport = LIVE_AIRPORTS.find((a) => a.icao === config.airportIcao)
     if (airport) {
       const [weather, elevation] = await Promise.all([
@@ -162,6 +163,11 @@ export function FlightSimulator() {
       liveWeatherRef.current = weather
       liveElevationRef.current = elevation
     }
+    setScreen('game')
+  }
+  const handleStemLesson = (lesson: StemLesson) => {
+    setSelectedAircraft(lesson.aircraftType as AircraftType)
+    setSelectedMissionKey(lesson.missionKey)
     setScreen('game')
   }
   const handleAircraftSelect = (ac: AircraftType, missionKey: string, liveWeather?: LiveWeatherData, liveElevation?: LiveElevationData) => {
@@ -192,6 +198,7 @@ export function FlightSimulator() {
         onAircraftSelect={() => setScreen('select')}
         onAchievements={() => setScreen('achievements')}
         onDailyFlight={() => setScreen('daily')}
+        onStem={() => setScreen('stem')}
         muted={settings.muted}
         onToggleMute={handleToggleMute}
         compatMode={settings.compatMode}
@@ -204,6 +211,15 @@ export function FlightSimulator() {
     return (
       <DailyFlightScreen
         onPlay={handleDailyFlight}
+        onBack={() => setScreen('menu')}
+      />
+    )
+  }
+
+  if (screen === 'stem') {
+    return (
+      <StemScreen
+        onFly={handleStemLesson}
         onBack={() => setScreen('menu')}
       />
     )

@@ -40,6 +40,7 @@ export function MainMenu({
   onAircraftSelect,
   onAchievements,
   onDailyFlight,
+  onStem,
   muted,
   onToggleMute,
   compatMode,
@@ -49,6 +50,7 @@ export function MainMenu({
   onAircraftSelect: () => void
   onAchievements: () => void
   onDailyFlight: () => void
+  onStem: () => void
   muted: boolean
   onToggleMute: () => void
   compatMode: boolean
@@ -85,6 +87,13 @@ export function MainMenu({
         className="w-64 border-emerald-400/40 bg-emerald-950/20 text-emerald-200 hover:bg-emerald-900/30"
       >
         <span aria-hidden="true">🏆 </span>{t('achievements')}
+      </Button>
+      <Button
+        variant="outline"
+        onClick={onStem}
+        className="w-64 border-purple-400/40 bg-purple-950/20 text-purple-200 hover:bg-purple-900/30"
+      >
+        <span aria-hidden="true">📚 </span>STEM Education
       </Button>
       <Button
         variant="outline"
