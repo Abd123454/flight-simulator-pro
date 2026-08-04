@@ -8,7 +8,7 @@ import { CameraController } from './CameraController'
 import { InputController } from './InputController'
 import { AudioEngine } from './AudioEngine'
 import { LODCuller } from './LODCuller'
-import { stepFlight, createInitialState, PHYS } from '../physics'
+import { stepFlight, createInitialState, PHYS, buildAircraftPhysics } from '../physics'
 import { WeatherSystem } from '../weather'
 import { setTextureCompatMode } from '../textures'
 import type { AircraftConfig } from '../aircraft-config'
@@ -92,6 +92,7 @@ export class FlightEngine {
 
   // aircraft + mission
   aircraftConfig: AircraftConfig
+  private aircraftPhysics: ReturnType<typeof buildAircraftPhysics>
   mission: MissionConfig
   afterburner = false
   score = 0
@@ -101,6 +102,9 @@ export class FlightEngine {
   missionElapsed = 0
 
   liveWeatherSource = ''
+  // cached GPU info (computed once, not every frame)
+  private cachedRendererInfo = ''
+  private cachedMaxAnisotropy = 1
   // autopilot
   autopilot = false
   autopilotHeading = 0 // degrees, target heading
@@ -132,6 +136,7 @@ export class FlightEngine {
   ) {
     this.container = container
     this.aircraftConfig = aircraftConfig
+    this.aircraftPhysics = buildAircraftPhysics(aircraftConfig)
     this.mission = mission
     this.state = createInitialState()
 
@@ -155,6 +160,19 @@ export class FlightEngine {
     this.renderer.domElement.style.display = 'block'
     this.renderer.domElement.style.width = '100%'
     this.renderer.domElement.style.height = '100%'
+
+    // Cache GPU info once (was being queried every frame — 60x/sec waste)
+    try {
+      const gl = this.renderer.getContext() as WebGLRenderingContext
+      const dbg = gl.getExtension('WEBGL_debug_renderer_info')
+      const vendor = dbg ? String(gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL)) : String(gl.getParameter(gl.VENDOR))
+      const renderer = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : String(gl.getParameter(gl.RENDERER))
+      const isWebGL2 = !!(gl as WebGL2RenderingContext).MAX_3D_TEXTURE_SIZE
+      this.cachedRendererInfo = `${vendor} / ${renderer} / WebGL ${isWebGL2 ? '2' : '1'}`
+    } catch {
+      this.cachedRendererInfo = 'unknown'
+    }
+    this.cachedMaxAnisotropy = this.renderer.capabilities?.getMaxAnisotropy?.() ?? 1
 
     this.scene = new THREE.Scene()
     this.env = new Environment(this.scene, this.renderer)
@@ -424,7 +442,7 @@ export class FlightEngine {
 
       while (this.accumulator >= STEP && steps < 30) {
         try {
-          stepFlight(this.state, this.orientation, apControls, STEP, this.weather.weather)
+          stepFlight(this.state, this.orientation, apControls, STEP, this.weather.weather, this.aircraftPhysics)
         } catch (err) {
           console.error('[FlightSim] physics error:', err)
           this.accumulator = 0
@@ -539,19 +557,8 @@ export class FlightEngine {
         gustActive: this.weather.isGustActive(),
         liveWeatherSource: this.liveWeatherSource,
         compatMode: compatMode,
-        rendererInfo: (() => {
-          try {
-            const gl = this.renderer.getContext() as WebGLRenderingContext
-            const dbg = gl.getExtension('WEBGL_debug_renderer_info')
-            const vendor = dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR)
-            const renderer = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)
-            const isWebGL2 = !!(gl as any).getParameter && (gl as WebGL2RenderingContext).MAX_3D_TEXTURE_SIZE !== undefined
-            return `${vendor} / ${renderer} / WebGL ${isWebGL2 ? '2' : '1'}`
-          } catch {
-            return 'unknown'
-          }
-        })(),
-        maxAnisotropy: this.renderer.capabilities?.getMaxAnisotropy?.() ?? 1,
+        rendererInfo: this.cachedRendererInfo,
+        maxAnisotropy: this.cachedMaxAnisotropy,
       })
     }
   }
@@ -714,6 +721,8 @@ export class FlightEngine {
     cancelAnimationFrame(this.raf)
     this.input.detach(window)
     this.audio.dispose()
+    this.airplane.dispose()
+    this.airport.dispose()
     this.env.dispose()
     this.renderer.dispose()
     this.renderer.domElement.remove()

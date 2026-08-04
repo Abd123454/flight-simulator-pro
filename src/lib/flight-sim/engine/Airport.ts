@@ -377,4 +377,18 @@ export class Airport {
       sock.scale.set(inflate, 1, 1)
     }
   }
+
+  /** Dispose all GPU resources (geometries, materials) held by this airport.
+   * Called from FlightEngine.dispose() to prevent memory leaks. */
+  dispose() {
+    this.group.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (mesh.geometry) mesh.geometry.dispose()
+      if (mesh.material) {
+        const mat = mesh.material as THREE.Material | THREE.Material[]
+        if (Array.isArray(mat)) mat.forEach((m) => m.dispose())
+        else mat.dispose()
+      }
+    })
+  }
 }

@@ -14,40 +14,35 @@
 import * as THREE from 'three'
 import type { FlightControls, FlightState } from './types'
 import type { Weather } from './weather'
+import type { AircraftConfig } from './aircraft-config'
 
+// Shared physics constants (ground handling, stability derivatives, etc.)
+// These don't change per aircraft. Per-aircraft values (mass, wingArea,
+// thrust, control rates, etc.) come from AircraftConfig and are merged
+// into an AircraftPhysics object at runtime.
 export const PHYS = {
-  mass: 65000, // kg
-  wingArea: 124.6, // m^2
-  maxThrust: 600_000, // N (realistic for 737-800: ~240kN × 2 engines, slightly boosted for arcade)
-  reverseThrust: 200_000,
   cl0: 0.25,
   clAlpha: 0.11, // per degree
-  clMax: 2.0, // with flaps, 737 CL_max ~ 2.0-2.5
-  flapsClBoost: 0.3, // extra CL per flap stage (also raises effective CL_max)
+  flapsClBoost: 0.3,
   flapsCdBoost: 0.015,
   spoilerCdBoost: 0.06,
   cd0: 0.022,
   inducedK: 0.045,
   stallAoA: 15, // degrees
   g: 9.81,
-  // control authority (rad/s) — realistic for a transport aircraft
-  // 737 pitch rate ~3°/s, roll ~5°/s. Boosted slightly for playability.
-  pitchRate: 0.15, // ~8.6°/s
-  rollRate: 0.6, // ~34°/s (arcade-friendly; real is ~5°/s)
-  yawRate: 0.12, // ~7°/s
   // stability derivatives (only active IN AIR)
-  cnBeta: 0.06, // directional stability
-  clBeta: -0.13, // dihedral effect
-  cmAlpha: -0.4, // pitch stability
-  clp: -0.4, // roll damping
-  cnr: -0.12, // yaw damping
-  cmq: -5.0, // pitch damping
+  cnBeta: 0.06,
+  clBeta: -0.13,
+  cmAlpha: -0.4,
+  clp: -0.4,
+  cnr: -0.12,
+  cmq: -5.0,
   // ground effect
   groundEffectHeight: 16,
   groundEffectStrength: 0.4,
-  // ground
+  // ground (shared across all aircraft)
   groundY: 3.2,
-  rollingFriction: 0.015, // very low — wheels roll freely
+  rollingFriction: 0.015,
   brakeFriction: 1.2,
   grassFriction: 0.25,
   groundSteerRate: 0.8,
@@ -59,14 +54,110 @@ export const PHYS = {
   autoLevelPitch: 0.2,
   coordinatedTurn: 0.3,
   rpmSlew: 0.8,
-  maxSpeed: 290,
   crashVerticalSpeed: 5.0,
   crashBankAngle: 50,
-  // realistic speeds
-  rotationSpeed: 70, // m/s — Vr for 737 ~ 250 km/h
-  takeoffSpeed: 78, // m/s — V2
-  approachSpeed: 75, // m/s — Vref
 } as const
+
+/** Merged physics config: shared PHYS values overridden by per-aircraft values.
+ * This is what stepFlight actually uses — each aircraft flies with its own
+ * mass, wing area, thrust, and control rates, not the 737 defaults. */
+export interface AircraftPhysics {
+  mass: number
+  wingArea: number
+  maxThrust: number
+  reverseThrust: number
+  clMax: number
+  pitchRate: number
+  rollRate: number
+  yawRate: number
+  maxSpeed: number
+  rotationSpeed: number
+  takeoffSpeed: number
+  // shared values (from PHYS, copied for convenience)
+  groundY: number
+  rollingFriction: number
+  brakeFriction: number
+  grassFriction: number
+  groundSteerRate: number
+  groundLevelRate: number
+  runwayHalfWidth: number
+  runwayHalfLength: number
+  autoLevelRoll: number
+  autoLevelPitch: number
+  coordinatedTurn: number
+  rpmSlew: number
+  crashVerticalSpeed: number
+  crashBankAngle: number
+  cl0: number
+  clAlpha: number
+  flapsClBoost: number
+  flapsCdBoost: number
+  spoilerCdBoost: number
+  cd0: number
+  inducedK: number
+  stallAoA: number
+  g: number
+  cnBeta: number
+  clBeta: number
+  cmAlpha: number
+  clp: number
+  cnr: number
+  cmq: number
+  groundEffectHeight: number
+  groundEffectStrength: number
+}
+
+/** Build a per-aircraft physics config by merging PHYS defaults with the
+ * aircraft-specific values from AircraftConfig. This is the fix for the
+ * critical bug where all aircraft used the 737's PHYS constant. */
+export function buildAircraftPhysics(cfg: AircraftConfig): AircraftPhysics {
+  return {
+    // per-aircraft values from config
+    mass: cfg.mass,
+    wingArea: cfg.wingArea,
+    maxThrust: cfg.maxThrust,
+    reverseThrust: cfg.reverseThrust,
+    clMax: cfg.clMax,
+    pitchRate: cfg.pitchRate,
+    rollRate: cfg.rollRate,
+    yawRate: cfg.yawRate,
+    maxSpeed: cfg.maxSpeed,
+    rotationSpeed: cfg.rotationSpeed,
+    takeoffSpeed: cfg.takeoffSpeed,
+    // shared values from PHYS
+    groundY: PHYS.groundY,
+    rollingFriction: PHYS.rollingFriction,
+    brakeFriction: PHYS.brakeFriction,
+    grassFriction: PHYS.grassFriction,
+    groundSteerRate: PHYS.groundSteerRate,
+    groundLevelRate: PHYS.groundLevelRate,
+    runwayHalfWidth: PHYS.runwayHalfWidth,
+    runwayHalfLength: PHYS.runwayHalfLength,
+    autoLevelRoll: PHYS.autoLevelRoll,
+    autoLevelPitch: PHYS.autoLevelPitch,
+    coordinatedTurn: PHYS.coordinatedTurn,
+    rpmSlew: PHYS.rpmSlew,
+    crashVerticalSpeed: PHYS.crashVerticalSpeed,
+    crashBankAngle: PHYS.crashBankAngle,
+    cl0: PHYS.cl0,
+    clAlpha: PHYS.clAlpha,
+    flapsClBoost: PHYS.flapsClBoost,
+    flapsCdBoost: PHYS.flapsCdBoost,
+    spoilerCdBoost: PHYS.spoilerCdBoost,
+    cd0: PHYS.cd0,
+    inducedK: PHYS.inducedK,
+    stallAoA: PHYS.stallAoA,
+    g: PHYS.g,
+    cnBeta: PHYS.cnBeta,
+    clBeta: PHYS.clBeta,
+    cmAlpha: PHYS.cmAlpha,
+    clp: PHYS.clp,
+    cnr: PHYS.cnr,
+    cmq: PHYS.cmq,
+    groundEffectHeight: PHYS.groundEffectHeight,
+    groundEffectStrength: PHYS.groundEffectStrength,
+  }
+}
 
 const _forward = new THREE.Vector3()
 const _up = new THREE.Vector3()
@@ -94,7 +185,8 @@ export function stepFlight(
   orientation: THREE.Quaternion,
   controls: FlightControls,
   dt: number,
-  weather?: Weather
+  weather: Weather | undefined,
+  phys: AircraftPhysics
 ): void {
   if (state.crashed) {
     state.velocity.x *= 0.9
@@ -110,7 +202,7 @@ export function stepFlight(
 
   // --- Determine ground contact BEFORE aerodynamics ---
   const wasAirborne = !state.onGround
-  const nowOnGround = state.position.y <= PHYS.groundY + 0.01
+  const nowOnGround = state.position.y <= phys.groundY + 0.01
 
   // --- Air velocity (airspeed = velocity - wind) ---
   _windVec.set(0, 0, 0)
@@ -166,34 +258,34 @@ export function stepFlight(
 
   // --- Flaps & spoilers ---
   const flapsStage = state.flaps
-  const clFlaps = flapsStage * PHYS.flapsClBoost
-  const cdFlaps = flapsStage * PHYS.flapsCdBoost
-  const cdSpoiler = state.spoilers ? PHYS.spoilerCdBoost : 0
+  const clFlaps = flapsStage * phys.flapsClBoost
+  const cdFlaps = flapsStage * phys.flapsCdBoost
+  const cdSpoiler = state.spoilers ? phys.spoilerCdBoost : 0
 
   // --- Ground effect ---
   const agl = Math.max(0, state.altitude)
   const geFactor =
-    agl < PHYS.groundEffectHeight
-      ? 1 - PHYS.groundEffectStrength * (1 - agl / PHYS.groundEffectHeight)
+    agl < phys.groundEffectHeight
+      ? 1 - phys.groundEffectStrength * (1 - agl / phys.groundEffectHeight)
       : 1
 
   // --- Lift / drag coefficients ---
   let cl: number
   let stalled = false
-  if (aoaAbs < PHYS.stallAoA) {
-    cl = PHYS.cl0 + PHYS.clAlpha * aoaDeg + clFlaps
-    cl = THREE.MathUtils.clamp(cl, -PHYS.clMax, PHYS.clMax)
+  if (aoaAbs < phys.stallAoA) {
+    cl = phys.cl0 + phys.clAlpha * aoaDeg + clFlaps
+    cl = THREE.MathUtils.clamp(cl, -phys.clMax, phys.clMax)
   } else {
     stalled = true
-    const drop = THREE.MathUtils.clamp(1 - (aoaAbs - PHYS.stallAoA) / 12, 0.25, 1)
-    const clPeak = PHYS.cl0 + PHYS.clAlpha * PHYS.stallAoA
+    const drop = THREE.MathUtils.clamp(1 - (aoaAbs - phys.stallAoA) / 12, 0.25, 1)
+    const clPeak = phys.cl0 + phys.clAlpha * phys.stallAoA
     cl = Math.sign(aoaDeg) * clPeak * drop
   }
-  const cd = PHYS.cd0 + PHYS.inducedK * cl * cl * geFactor + cdFlaps + cdSpoiler
+  const cd = phys.cd0 + phys.inducedK * cl * cl * geFactor + cdFlaps + cdSpoiler
 
   const q = 0.5 * rho * speed * speed
-  const liftMag = q * PHYS.wingArea * cl
-  const dragMag = q * PHYS.wingArea * cd
+  const liftMag = q * phys.wingArea * cl
+  const dragMag = q * phys.wingArea * cd
 
   // --- Forces ---
   _lift.copy(_up).multiplyScalar(liftMag)
@@ -202,33 +294,33 @@ export function stepFlight(
   _vDir.normalize()
   _drag.copy(_vDir).multiplyScalar(-dragMag)
   // Side force from sideslip (only in air)
-  const sideForceMag = !nowOnGround ? q * PHYS.wingArea * 0.3 * betaRad : 0
+  const sideForceMag = !nowOnGround ? q * phys.wingArea * 0.3 * betaRad : 0
   _side.copy(_right).multiplyScalar(-sideForceMag)
 
   // --- Thrust ---
   let thrustMag: number
   if (state.reverseThrust && nowOnGround) {
-    thrustMag = -state.throttle * PHYS.reverseThrust
+    thrustMag = -state.throttle * phys.reverseThrust
   } else {
-    thrustMag = state.throttle * PHYS.maxThrust
+    thrustMag = state.throttle * phys.maxThrust
   }
   _thrust.copy(_forward).multiplyScalar(thrustMag)
-  _grav.set(0, -PHYS.g * PHYS.mass, 0)
+  _grav.set(0, -phys.g * phys.mass, 0)
 
   _force.set(0, 0, 0)
   _force.add(_lift).add(_drag).add(_side).add(_thrust).add(_grav)
 
   // --- Integrate linear motion ---
-  const ax = _force.x / PHYS.mass
-  const ay = _force.y / PHYS.mass
-  const az = _force.z / PHYS.mass
+  const ax = _force.x / phys.mass
+  const ay = _force.y / phys.mass
+  const az = _force.z / phys.mass
   state.velocity.x += ax * dt
   state.velocity.y += ay * dt
   state.velocity.z += az * dt
 
   const sp = Math.hypot(state.velocity.x, state.velocity.y, state.velocity.z)
-  if (sp > PHYS.maxSpeed) {
-    const k = PHYS.maxSpeed / sp
+  if (sp > phys.maxSpeed) {
+    const k = phys.maxSpeed / sp
     state.velocity.x *= k
     state.velocity.y *= k
     state.velocity.z *= k
@@ -243,29 +335,29 @@ export function stepFlight(
   const aeroAuth = THREE.MathUtils.clamp((forwardSpeed - 5) / 50, 0, 1)
   const steerAuth = 0.35 + 0.65 * aeroAuth
 
-  let pitchRate = controls.pitch * PHYS.pitchRate * aeroAuth
-  let rollRate = controls.roll * PHYS.rollRate * aeroAuth
-  let yawRate = controls.yaw * PHYS.yawRate * steerAuth
+  let pitchRate = controls.pitch * phys.pitchRate * aeroAuth
+  let rollRate = controls.roll * phys.rollRate * aeroAuth
+  let yawRate = controls.yaw * phys.yawRate * steerAuth
 
   // Stability moments — ONLY IN AIR (wheels hold heading on ground)
   if (!nowOnGround) {
     // Weathervaning: yaw nose into relative wind (gentle)
-    yawRate += PHYS.cnBeta * betaRad * aeroAuth * 1.5
+    yawRate += phys.cnBeta * betaRad * aeroAuth * 1.5
     // Dihedral: sideslip rolls level (gentle)
-    rollRate += PHYS.clBeta * betaRad * aeroAuth * 1.0
+    rollRate += phys.clBeta * betaRad * aeroAuth * 1.0
     // Pitch stability: nose-down with increasing AoA (gentle restoring)
-    pitchRate += -PHYS.cmAlpha * aoaRad * aeroAuth * 0.3
+    pitchRate += -phys.cmAlpha * aoaRad * aeroAuth * 0.3
     // Roll damping
-    rollRate += PHYS.clp * state.roll * aeroAuth
+    rollRate += phys.clp * state.roll * aeroAuth
     // Yaw damping (yaw damper)
-    yawRate += PHYS.cnr * state.yaw * aeroAuth * 1.5
+    yawRate += phys.cnr * state.yaw * aeroAuth * 1.5
     // Pitch damping
-    pitchRate += PHYS.cmq * state.pitch * aeroAuth * 0.02
+    pitchRate += phys.cmq * state.pitch * aeroAuth * 0.02
     // Mild auto-level when no input
-    if (Math.abs(controls.roll) < 0.01) rollRate += -state.roll * PHYS.autoLevelRoll * aeroAuth
-    if (Math.abs(controls.pitch) < 0.01) pitchRate += -state.pitch * PHYS.autoLevelPitch * aeroAuth
+    if (Math.abs(controls.roll) < 0.01) rollRate += -state.roll * phys.autoLevelRoll * aeroAuth
+    if (Math.abs(controls.pitch) < 0.01) pitchRate += -state.pitch * phys.autoLevelPitch * aeroAuth
     // Coordinated turn assist (gentle — just enough to keep nose following bank)
-    yawRate += Math.sin(state.roll) * PHYS.coordinatedTurn * aeroAuth
+    yawRate += Math.sin(state.roll) * phys.coordinatedTurn * aeroAuth
   }
 
   _deltaQ.identity()
@@ -289,15 +381,15 @@ export function stepFlight(
   orientation.normalize()
 
   // --- Ground handling ---
-  if (state.position.y <= PHYS.groundY) {
+  if (state.position.y <= phys.groundY) {
     state.onGround = true
     if (wasAirborne) {
       const bankDeg = Math.abs(state.roll * DEG)
       const vspeed = state.velocity.y
-      if (vspeed < -PHYS.crashVerticalSpeed) {
+      if (vspeed < -phys.crashVerticalSpeed) {
         state.crashed = true
         state.crashReason = 'hard landing'
-      } else if (bankDeg > PHYS.crashBankAngle && speed > 20) {
+      } else if (bankDeg > phys.crashBankAngle && speed > 20) {
         state.crashed = true
         state.crashReason = 'wing strike'
       }
@@ -307,7 +399,7 @@ export function stepFlight(
         state.landedSmoothly = vspeed > -2.0
       }
     }
-    state.position.y = PHYS.groundY
+    state.position.y = phys.groundY
     if (state.velocity.y < 0) state.velocity.y = 0
 
     // On the ground: wheels hold the aircraft on its heading. Kill ONLY the
@@ -336,8 +428,8 @@ export function stepFlight(
 
     // Friction: check if on ANY runway (main airport + Northfield)
     const onMainRunway =
-      Math.abs(state.position.x) < PHYS.runwayHalfWidth + 5 &&
-      Math.abs(state.position.z) < PHYS.runwayHalfLength
+      Math.abs(state.position.x) < phys.runwayHalfWidth + 5 &&
+      Math.abs(state.position.z) < phys.runwayHalfLength
     // Northfield airport: runway at z=-5500, half-width ~23, half-length ~1000
     const northfieldZ = -5500
     const onNorthfield =
@@ -345,16 +437,16 @@ export function stepFlight(
       Math.abs(state.position.z - northfieldZ) < 1000
     const onRunway = onMainRunway || onNorthfield
     const fric = controls.brake
-      ? PHYS.brakeFriction
+      ? phys.brakeFriction
       : onRunway
-        ? PHYS.rollingFriction
-        : PHYS.grassFriction
+        ? phys.rollingFriction
+        : phys.grassFriction
     const decay = Math.max(0, 1 - fric * dt)
     state.velocity.x *= decay
     state.velocity.z *= decay
 
     // Nose wheel steering (rudder on ground)
-    const steer = controls.yaw * PHYS.groundSteerRate * (1 - THREE.MathUtils.clamp(speed / 30, 0, 1) * 0.5)
+    const steer = controls.yaw * phys.groundSteerRate * (1 - THREE.MathUtils.clamp(speed / 30, 0, 1) * 0.5)
     _axis.set(0, 1, 0)
     _tmpQ.setFromAxisAngle(_axis, -steer * dt)
     orientation.premultiply(_tmpQ)
@@ -389,12 +481,12 @@ export function stepFlight(
   state.aoa = aoaDeg
   state.sideslip = betaDeg
   state.stalled = stalled
-  state.gForce = liftMag / (PHYS.mass * PHYS.g)
+  state.gForce = liftMag / (phys.mass * phys.g)
   state.controlPitch = controls.pitch
   state.controlRoll = controls.roll
   state.controlYaw = controls.yaw
 
-  const slew = 1 - Math.exp(-PHYS.rpmSlew * dt)
+  const slew = 1 - Math.exp(-phys.rpmSlew * dt)
   state.rpmNorm += (state.throttle - state.rpmNorm) * slew
 
   if (!state.onGround) state.flightTime += dt

@@ -89,7 +89,7 @@ export function MainMenu({
         Compatibility Mode: {compatMode ? 'ON' : 'OFF'}
       </Button>
       <div className="mt-6 max-w-md rounded-lg border border-white/10 bg-black/30 p-4 text-center text-xs leading-relaxed text-white/60">
-        <p className="mb-2 font-semibold text-cyan-300/90">4 Aircraft · 4 Mission Types · 10 Achievements</p>
+        <p className="mb-2 font-semibold text-cyan-300/90">4 Aircraft · 6 Missions · 12 Achievements</p>
         Fly the <span className="text-white/80">737 Airliner</span>, <span className="text-amber-300">F-16 Fighter</span> (with afterburner),
         <span className="text-red-300"> Extra 300 Stunt</span>, or <span className="text-green-300">C-130 Cargo</span>.
         Choose Free Flight, Canyon Sprint Race, Landing Challenge, or Target Practice.
@@ -207,10 +207,15 @@ export function EndScreen({
   onQuit: () => void
 }) {
   const success = result === 'success'
-  const vsScore = success ? Math.max(0, 100 - Math.abs(landingVSpeed) * 30) : 0
-  const spScore = success ? Math.max(0, 100 - Math.max(0, landingSpeed - 60) * 2) : 0
-  const totalScore = Math.round((vsScore + spScore) / 2)
-  const rating = totalScore >= 90 ? 'PERFECT' : totalScore >= 70 ? 'GOOD' : totalScore >= 50 ? 'OK' : 'ROUGH'
+  // Only show landing rating for missions that actually involve landing
+  // (landing, crosscountry, storm). For combat/race/freeflight, the landing
+  // stats are meaningless (0/0) and showing "PERFECT" is misleading.
+  const hasLanding = landingVSpeed < 0 || landingSpeed > 0
+  const vsScore = success && hasLanding ? Math.max(0, 100 - Math.abs(landingVSpeed) * 30) : 0
+  const spScore = success && hasLanding ? Math.max(0, 100 - Math.max(0, landingSpeed - 60) * 2) : 0
+  const totalScore = hasLanding ? Math.round((vsScore + spScore) / 2) : 0
+  const rating = !hasLanding ? '' :
+    totalScore >= 90 ? 'PERFECT' : totalScore >= 70 ? 'GOOD' : totalScore >= 50 ? 'OK' : 'ROUGH'
 
   return (
     <MenuShell
@@ -263,7 +268,7 @@ export function EndScreen({
           </>
         )}
       </div>
-      {success && (
+      {success && hasLanding && rating && (
         <div className="mb-2 flex flex-col items-center">
           <div className="text-[10px] uppercase tracking-widest text-white/40">Landing Rating</div>
           <div className={`text-sm font-bold ${totalScore >= 70 ? 'text-emerald-300' : totalScore >= 50 ? 'text-amber-300' : 'text-orange-300'}`}>

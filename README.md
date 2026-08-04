@@ -97,6 +97,7 @@ Missions unlock sequentially as you complete them:
 | Camera | C | X button |
 | Flaps | F/V | Y / LB |
 | Spoilers | B | RB |
+| Reverse thrust | X | DLeft |
 | Weather cycle | 1-4 | — |
 | Autopilot | P | — |
 | Pause | Esc | Start |

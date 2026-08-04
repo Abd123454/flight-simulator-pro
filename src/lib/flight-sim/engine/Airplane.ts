@@ -98,8 +98,7 @@ export class Airplane {
         }
       })
 
-      // Remove procedural children, add the real model
-      // (keep fans/gear/smoke groups — they're separate)
+      // Remove procedural children, disposing their GPU resources first
       const toRemove: THREE.Object3D[] = []
       this.group.children.forEach((c) => {
         if (!this.fans.includes(c as THREE.Group) &&
@@ -109,7 +108,19 @@ export class Airplane {
           toRemove.push(c)
         }
       })
-      toRemove.forEach((c) => this.group.remove(c))
+      toRemove.forEach((c) => {
+        // dispose geometry + material before removing (prevents GPU memory leak)
+        c.traverse((o) => {
+          const mesh = o as THREE.Mesh
+          if (mesh.geometry) mesh.geometry.dispose()
+          if (mesh.material) {
+            const mat = mesh.material as THREE.Material | THREE.Material[]
+            if (Array.isArray(mat)) mat.forEach((m) => m.dispose())
+            else mat.dispose()
+          }
+        })
+        this.group.remove(c)
+      })
 
       this.group.add(model)
       this.modelLoaded = true
@@ -587,5 +598,26 @@ export class Airplane {
     if (this.smokeGroup) return
     this.smokeGroup = new THREE.Group()
     this.group.add(this.smokeGroup)
+  }
+
+  /** Dispose all GPU resources (geometries, materials) held by this airplane.
+   * Called from FlightEngine.dispose() to prevent memory leaks on scene
+   * teardown / aircraft switch. */
+  dispose() {
+    this.group.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (mesh.geometry) mesh.geometry.dispose()
+      if (mesh.material) {
+        const mat = mesh.material as THREE.Material | THREE.Material[]
+        if (Array.isArray(mat)) mat.forEach((m) => m.dispose())
+        else mat.dispose()
+      }
+    })
+    // clear arrays so references don't keep disposed objects alive
+    this.fans = []
+    this.gearGroups = []
+    this.afterburnerFlames = []
+    this.smokePuffs = []
+    this.smokeGroup = null
   }
 }

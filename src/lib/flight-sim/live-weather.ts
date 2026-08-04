@@ -37,11 +37,15 @@ export interface LiveElevationData {
 }
 
 /** Fetch live weather from Open-Meteo for a given airport.
- * Returns null if the fetch fails (network error, rate limit, etc). */
+ * Returns null if the fetch fails (network error, rate limit, timeout, etc).
+ * Uses AbortController with a 5-second timeout to prevent infinite hangs. */
 export async function fetchLiveWeather(airport: AirportWeather): Promise<LiveWeatherData | null> {
   try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000)
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${airport.latitude}&longitude=${airport.longitude}&current=wind_speed_10m,wind_direction_10m,visibility`
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: controller.signal })
+    clearTimeout(timeoutId)
     if (!res.ok) return null
     const data = await res.json()
     const current = data.current
@@ -88,7 +92,10 @@ export async function fetchLiveElevation(airport: AirportWeather): Promise<LiveE
       }
     }
     const url = `https://api.open-elevation.com/api/v1/lookup?locations=${locations.join('|')}`
-    const res = await fetch(url)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 8000) // elevation API can be slow
+    const res = await fetch(url, { signal: controller.signal })
+    clearTimeout(timeoutId)
     if (!res.ok) return null
     const data = await res.json()
     const results = data.results
