@@ -1,6 +1,7 @@
-// Procedural low-poly airplanes — supports multiple types (airliner, fighter,
-// stunt, cargo). Forward = -Z. Provides update(state) for fans, gear, afterburner.
+// Airplanes — supports both procedural geometry AND real GLB models from
+// Poly Pizza (CC0/CC-BY). Forward = -Z. Provides update(state) for fans, gear, afterburner.
 import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import type { FlightState } from '../types'
 import type { AircraftConfig, AircraftType } from '../aircraft-config'
 
@@ -15,6 +16,19 @@ function cyl(rTop: number, rBot: number, h: number, seg = 10) {
   return new THREE.CylinderGeometry(rTop, rBot, h, seg)
 }
 
+// Shared GLTF loader instance
+const gltfLoader = new GLTFLoader()
+
+// Per-type model paths + normalization config.
+// Target sizes chosen to roughly match real aircraft dimensions:
+//   airliner ~38m, fighter ~15m, stunt ~7m, cargo ~30m
+const MODEL_CONFIG: Record<AircraftType, { path: string; targetLength: number; rotationY: number }> = {
+  airliner: { path: '/models/airliner.glb', targetLength: 38, rotationY: 0 },
+  fighter:  { path: '/models/fighter.glb',  targetLength: 15, rotationY: 0 },
+  stunt:    { path: '/models/stunt.glb',    targetLength: 7,  rotationY: 0 },
+  cargo:    { path: '/models/cargo.glb',    targetLength: 30, rotationY: 0 },
+}
+
 export class Airplane {
   group: THREE.Group
   type: AircraftType
@@ -26,29 +40,93 @@ export class Airplane {
   private smokeGroup: THREE.Group | null = null
   private smokeTimer = 0
   private smokePuffs: { mesh: THREE.Mesh; vel: THREE.Vector3; life: number }[] = []
-  // afterburner flame
   private afterburnerFlames: THREE.Mesh[] = []
   private afterburnerIntensity = 0
+  // whether the GLB model has been loaded
+  private modelLoaded = false
 
   constructor(config: AircraftConfig) {
     this.config = config
     this.type = config.type
     this.group = new THREE.Group()
-    this.group.scale.setScalar(config.scale)
 
-    // Build the right model for the aircraft type
-    switch (config.type) {
-      case 'fighter':
-        this.buildFighter()
-        break
-      case 'stunt':
-        this.buildStunt()
-        break
-      case 'cargo':
-        this.buildCargo()
-        break
-      default:
-        this.buildAirliner()
+    // Build procedural geometry immediately (as fallback while GLB loads)
+    this.buildProcedural()
+
+    // Async-load the real GLB model, replacing procedural geometry on arrival
+    this.loadGLBModel()
+  }
+
+  /** Load the real GLB model, normalizing scale + orientation. */
+  private async loadGLBModel() {
+    const mc = MODEL_CONFIG[this.type]
+    if (!mc) return
+    try {
+      const gltf = await gltfLoader.loadAsync(mc.path)
+      const model = gltf.scene
+
+      // Compute bounding box to find current size
+      const box = new THREE.Box3().setFromObject(model)
+      const size = new THREE.Vector3()
+      box.getSize(size)
+      const maxDim = Math.max(size.x, size.y, size.z)
+
+      // Normalize scale so the longest dimension matches targetLength
+      if (maxDim > 0) {
+        const scale = mc.targetLength / maxDim
+        model.scale.setScalar(scale)
+      }
+
+      // Apply rotation to align forward axis (-Z in our sim)
+      model.rotation.y = mc.rotationY
+
+      // Center the model on the origin (horizontally)
+      const scaledBox = new THREE.Box3().setFromObject(model)
+      const center = new THREE.Vector3()
+      scaledBox.getCenter(center)
+      model.position.x -= center.x
+      model.position.z -= center.z
+      // Sit the model so its bottom is at y=0 (gear ground line)
+      model.position.y -= scaledBox.min.y
+
+      // Enable shadows on all meshes
+      model.traverse((o) => {
+        const mesh = o as THREE.Mesh
+        if (mesh.isMesh) {
+          mesh.castShadow = true
+          mesh.receiveShadow = true
+        }
+      })
+
+      // Remove procedural children, add the real model
+      // (keep fans/gear/smoke groups — they're separate)
+      const toRemove: THREE.Object3D[] = []
+      this.group.children.forEach((c) => {
+        if (!this.fans.includes(c as THREE.Group) &&
+            !this.gearGroups.includes(c as THREE.Group) &&
+            c !== this.smokeGroup &&
+            !this.afterburnerFlames.includes(c as THREE.Mesh)) {
+          toRemove.push(c)
+        }
+      })
+      toRemove.forEach((c) => this.group.remove(c))
+
+      this.group.add(model)
+      this.modelLoaded = true
+    } catch (err) {
+      // GLB load failed — keep procedural geometry (already built)
+      console.warn(`[Airplane] GLB load failed for ${this.type}, using procedural:`, err)
+    }
+  }
+
+  /** Build procedural geometry (the original buildAirliner/buildFighter/etc). */
+  private buildProcedural() {
+    this.group.scale.setScalar(this.config.scale)
+    switch (this.type) {
+      case 'fighter': this.buildFighter(); break
+      case 'stunt':   this.buildStunt();   break
+      case 'cargo':   this.buildCargo();   break
+      default:        this.buildAirliner();break
     }
   }
 

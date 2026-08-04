@@ -104,20 +104,31 @@ Missions unlock sequentially as you complete them:
 ## Tech Stack
 
 - **Framework**: Next.js 16 (App Router, Turbopack)
-- **3D**: Three.js + procedural geometry
+- **3D**: Three.js + real low-poly aircraft models (Poly Pizza) + procedural terrain
 - **Audio**: Web Audio API (two-layer procedural engine sound)
 - **Styling**: Tailwind CSS 4 + 2 shadcn/ui components (button, slider)
 - **Live data**: Open-Meteo (weather, free, no API key), Open-Elevation (terrain, free)
 
-## Design Decision: 100% Procedural Assets
+## Design Decision: Real Aircraft Models from Poly Pizza
 
-This project uses **only procedural geometry and textures** — no external 3D model files (`.glb`/`.gltf`) or image textures are bundled. This was a deliberate choice:
+The 4 playable aircraft use **real low-poly 3D models** sourced from [Poly Pizza](https://poly.pizza) (a free, low-poly model library). These are stylized game-art models — not photorealistic — but a significant visual upgrade from the original box-and-cylinder procedural geometry. All terrain, airport structures, and textures remain 100% procedural.
 
-1. **Licensing verification problem**: The audit attempted to integrate CC0/CC-BY models from Sketchfab, but the site's scraped HTML gave inconsistent license metadata (CC0 in the page title vs "CC Attribution" in structured data for the same model). Reliable license verification required manual browser inspection, which wasn't possible in the development environment.
-2. **Performance**: Procedural geometry keeps the bundle tiny and loads instantly — important for a browser game targeting integrated graphics.
-3. **Simplicity**: No build-time asset pipeline, no asset loading wait, no model format conversion.
+### Model Credits (required by CC-BY license)
 
-All aircraft, airports, terrain, and textures are generated from code at runtime. Real-world *data* (aircraft specs, elevation profiles, live weather) is sourced from APIs and embedded as numbers, but no binary art assets are used.
+| Aircraft | Model | Creator | License | URL |
+|----------|-------|---------|---------|-----|
+| Skyliner 737 (airliner) | Boeing 747 | Miha Lunar | **CC-BY** | [poly.pizza/m/49CLof4tP2V](https://poly.pizza/m/49CLof4tP2V) |
+| Falcon F-16 (fighter) | Low poly Fighter | Stephen Graybill | **CC0** | [poly.pizza/m/1fi8ZIDdFCP](https://poly.pizza/m/1fi8ZIDdFCP) |
+| Acro Extra 300 (stunt) | Small Airplane | Vojtěch Balák | **CC-BY** | [poly.pizza/m/7cvx6ex-xfL](https://poly.pizza/m/7cvx6ex-xfL) |
+| Heavy C-130 (cargo) | Airplane | Poly by Google | **CC-BY** | [poly.pizza/m/8ciDd9k8wha](https://poly.pizza/m/8ciDd9k8wha) |
+
+**Total model size: 400 KB** (4 `.glb` files). Well within the "loads instantly" target for integrated graphics.
+
+**Note on substitutions:** There is no exact F-16 or Extra 300 model on Poly Pizza. The "Low poly Fighter" (CC0) is a reasonable substitute for the F-16, and "Small Airplane" (CC-BY) approximates the Extra 300 aerobatic plane. The Boeing 747 model is used for the 737 airliner role — it's a 4-engine jumbo rather than a 737, but it's the closest commercial-jet model available. No convincing C-130 cargo plane was found, so the generic "Airplane" by Poly by Google is used as a substitute.
+
+### Why this replaced the "100% Procedural" decision
+
+The original design kept everything procedural due to a licensing-verification problem with Sketchfab (inconsistent CC0/CC-BY metadata in scraped HTML). Poly Pizza solved this by providing license information as structured data in the model page HTML (explicit "Public Domain (CC0)" or "CC-BY" text visible in the page content), and direct `.glb` download URLs on their CDN (`static.poly.pizza`). This made it possible to programmatically verify licenses and download models without a browser.
 
 ## Getting Started
 
@@ -130,6 +141,8 @@ bun run dev
 ## Architecture
 
 ```
+public/models/                # 4 real aircraft .glb files (Poly Pizza, CC0/CC-BY)
+
 src/lib/flight-sim/
 ├── physics.ts              # Blade-element flight model + stability
 ├── aircraft-config.ts      # 4 aircraft configurations
