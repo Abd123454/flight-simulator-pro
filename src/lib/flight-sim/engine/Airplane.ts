@@ -22,6 +22,8 @@ const gltfLoader = new GLTFLoader()
 // Per-type model paths + normalization config.
 // Target sizes chosen to roughly match real aircraft dimensions:
 //   airliner ~38m, fighter ~15m, stunt ~7m, cargo ~30m
+// Models can be upgraded to high-quality Sketchfab CC-BY versions.
+// See ATTRIBUTION.md for download instructions.
 const MODEL_CONFIG: Record<AircraftType, { path: string; targetLength: number; rotationY: number }> = {
   airliner: { path: '/models/airliner.glb', targetLength: 38, rotationY: 0 },
   fighter:  { path: '/models/fighter.glb',  targetLength: 15, rotationY: 0 },
