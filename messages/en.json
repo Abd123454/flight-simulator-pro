@@ -1,0 +1,102 @@
+{
+  "menu": {
+    "title": "Flight Simulator",
+    "subtitle": "Pro · Multi-Aircraft Combat Edition",
+    "quickFlight": "Quick Flight (737)",
+    "selectAircraft": "Select Aircraft & Mission",
+    "achievements": "Achievements",
+    "sound": "Sound",
+    "soundOn": "On",
+    "soundOff": "Off",
+    "compatMode": "Compatibility Mode",
+    "compatDesc": "Disables shadows, AA, rain, reduces terrain detail. For Intel HD 620/630 green-artifact issue."
+  },
+  "aircraft": {
+    "airliner": "Skyliner 737",
+    "fighter": "Falcon F-16",
+    "stunt": "Acro Extra 300",
+    "cargo": "Heavy C-130",
+    "speed": "Speed",
+    "agility": "Agility",
+    "stability": "Stability",
+    "armor": "Armor"
+  },
+  "mission": {
+    "freeflight": "Free Flight",
+    "landing": "Landing Challenge",
+    "race": "Canyon Sprint",
+    "crosscountry": "Cross Country",
+    "combat": "Target Practice",
+    "storm": "Storm Runner",
+    "launch": "Launch Mission",
+    "back": "Back",
+    "campaign": "Campaign Missions"
+  },
+  "hud": {
+    "speed": "Speed",
+    "altitude": "Altitude",
+    "heading": "Heading",
+    "throttle": "Throttle",
+    "wind": "Wind",
+    "gear": "Gear",
+    "gearDown": "DOWN",
+    "gearUp": "UP",
+    "flaps": "Flaps",
+    "spoilers": "Splr",
+    "view": "VIEW",
+    "score": "SCORE",
+    "combo": "COMBO",
+    "gates": "GATES",
+    "targets": "TARGETS",
+    "stall": "STALL",
+    "approachingStall": "APPROACHING STALL",
+    "afterburner": "AFTERBURNER",
+    "autopilot": "AP",
+    "gust": "GUST!",
+    "live": "LIVE"
+  },
+  "controls": {
+    "pitch": "pitch",
+    "roll": "roll",
+    "rudder": "rudder",
+    "throttle": "throttle",
+    "brake": "brake",
+    "gear": "gear",
+    "flaps": "flaps",
+    "spoilers": "spoilers",
+    "reverse": "reverse",
+    "camera": "camera",
+    "weather": "weather",
+    "autopilot": "autopilot",
+    "pause": "pause"
+  },
+  "end": {
+    "complete": "Mission Complete",
+    "failed": "Mission Failed",
+    "flyAgain": "Fly Again",
+    "quitToMenu": "Quit to Menu",
+    "flightTime": "Flight Time",
+    "maxAltitude": "Max Altitude",
+    "touchdownVS": "Touchdown VS",
+    "touchdownSpd": "Touchdown Spd",
+    "landingRating": "Landing Rating",
+    "finalScore": "Final Score",
+    "unlocked": "Achievement Unlocked!"
+  },
+  "pause": {
+    "title": "Paused",
+    "subtitle": "Flight on hold",
+    "resume": "Resume",
+    "restart": "Restart Flight",
+    "sensitivity": "Sensitivity",
+    "volume": "Volume"
+  },
+  "units": {
+    "kmh": "km/h",
+    "knots": "kts",
+    "meters": "m",
+    "feet": "ft",
+    "fpm": "fpm",
+    "ms": "m/s"
+  }
+}

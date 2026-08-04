@@ -1,19 +1,12 @@
 import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
+
+const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
   reactStrictMode: false,
-  // Allow preview panel domains to load dev resources (chunks, HMR).
-  allowedDevOrigins: [
-    "*.space-z.ai",
-    "space-z.ai",
-    "localhost",
-    "127.0.0.1",
-  ],
-  // Enable tree-shaking for Three.js (was importing ~600KB as one chunk)
-  experimental: {
-    optimizePackageImports: ["three"],
-  },
-  // Security headers (OWASP recommendations)
+  allowedDevOrigins: ["*.space-z.ai", "space-z.ai", "localhost", "127.0.0.1"],
+  experimental: { optimizePackageImports: ["three"] },
   async headers() {
     return [
       {
@@ -29,4 +22,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

@@ -45,12 +45,18 @@ const DEFAULT_PROGRESS: PlayerProgress = {
   completedMissions: [],
 }
 
-/** Load progress from localStorage (client-side only). */
+/** Load progress from localStorage (client-side only).
+ * Returns a deep copy of defaults so callers can safely mutate. */
 export function loadProgress(): PlayerProgress {
-  if (typeof window === 'undefined') return DEFAULT_PROGRESS
+  const defaults = (): PlayerProgress => ({
+    ...DEFAULT_PROGRESS,
+    achievements: DEFAULT_ACHIEVEMENTS.map((a) => ({ ...a })),
+    completedMissions: [],
+  })
+  if (typeof window === 'undefined') return defaults()
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return DEFAULT_PROGRESS
+    if (!raw) return defaults()
     const data = JSON.parse(raw) as PlayerProgress
     // merge with defaults to handle new achievements added later
     return {

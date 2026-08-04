@@ -1,0 +1,102 @@
+{
+  "menu": {
+    "title": "محاكي الطيران",
+    "subtitle": "احترافي · نسخة متعددة الطائرات",
+    "quickFlight": "رحلة سريعة (737)",
+    "selectAircraft": "اختيار الطائرة والمهمة",
+    "achievements": "الإنجازات",
+    "sound": "الصوت",
+    "soundOn": "تشغيل",
+    "soundOff": "إيقاف",
+    "compatMode": "وضع التوافق",
+    "compatDesc": "يعطل الظلال، التنعيم، المطر، ويقلل تفاصيل التضاريس. لحل مشكلة التشوهات الخضراء على كروت Intel HD 620/630."
+  },
+  "aircraft": {
+    "airliner": "سكايلينر 737",
+    "fighter": "فالكون F-16",
+    "stunt": "أكرو إكسترا 300",
+    "cargo": "هيفي C-130",
+    "speed": "السرعة",
+    "agility": "المناورة",
+    "stability": "الاستقرار",
+    "armor": "التحمل"
+  },
+  "mission": {
+    "freeflight": "طيران حر",
+    "landing": "تحدي الهبوط",
+    "race": "سباق الخوانق",
+    "crosscountry": "طيران عبر البلاد",
+    "combat": "تدمير الأهداف",
+    "storm": "عداء العاصفة",
+    "launch": "بدء المهمة",
+    "back": "رجوع",
+    "campaign": "مهام الحملة"
+  },
+  "hud": {
+    "speed": "السرعة",
+    "altitude": "الارتفاع",
+    "heading": "الاتجاه",
+    "throttle": "الدفع",
+    "wind": "الرياح",
+    "gear": "العجلات",
+    "gearDown": "مفتوحة",
+    "gearUp": "مغلقة",
+    "flaps": "القلابات",
+    "spoilers": "المفرملات",
+    "view": "العرض",
+    "score": "النقاط",
+    "combo": "متتالي",
+    "gates": "البوابات",
+    "targets": "الأهداف",
+    "stall": "انقطاع رفع",
+    "approachingStall": "اقتراب انقطاع الرفع",
+    "afterburner": "حارق لاحق",
+    "autopilot": "تلقائي",
+    "gust": "هبة ريح!",
+    "live": "حي"
+  },
+  "controls": {
+    "pitch": "انحدار",
+    "roll": "ميل",
+    "rudder": "دفة",
+    "throttle": "دفع",
+    "brake": "مكبح",
+    "gear": "عجلات",
+    "flaps": "قلابات",
+    "spoilers": "مفرملات",
+    "reverse": "عكسي",
+    "camera": "كاميرا",
+    "weather": "طقس",
+    "autopilot": "تلقائي",
+    "pause": "إيقاف"
+  },
+  "end": {
+    "complete": "اكتملت المهمة",
+    "failed": "فشلت المهمة",
+    "flyAgain": "العب مرة أخرى",
+    "quitToMenu": "العودة للقائمة",
+    "flightTime": "وقت الطيران",
+    "maxAltitude": "أقصى ارتفاع",
+    "touchdownVS": "سرعة الهبوط العمودية",
+    "touchdownSpd": "سرعة اللمس",
+    "landingRating": "تقييم الهبوط",
+    "finalScore": "النقاط النهائية",
+    "unlocked": "تم فتح إنجاز!"
+  },
+  "pause": {
+    "title": "متوقف",
+    "subtitle": "الرحلة متوقفة",
+    "resume": "متابعة",
+    "restart": "إعادة الرحلة",
+    "sensitivity": "الحساسية",
+    "volume": "مستوى الصوت"
+  },
+  "units": {
+    "kmh": "كم/س",
+    "knots": "عقدة",
+    "meters": "م",
+    "feet": "قدم",
+    "fpm": "قدم/د",
+    "ms": "م/ث"
+  }
+}

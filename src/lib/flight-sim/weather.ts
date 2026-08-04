@@ -73,7 +73,6 @@ export class WeatherSystem {
   setLiveWeather(windSpeed: number, windDir: number, visibility: number) {
     this.baseSpeed = windSpeed
     this.baseDir = windDir
-    this.liveVisibilityLocked = true // lock visibility to the live value
     // clamp visibility into a sensible range for the sim
     this.weather.visibility = Math.max(500, Math.min(visibility, 12000))
     // pick a condition based on visibility (rough mapping)
@@ -86,6 +85,8 @@ export class WeatherSystem {
     } else {
       this.setCondition('clear')
     }
+    // Lock visibility AFTER setCondition (setCondition unlocks it)
+    this.liveVisibilityLocked = true
     // re-apply the real visibility (setCondition overwrites it)
     this.weather.visibility = Math.max(500, Math.min(visibility, 12000))
   }
