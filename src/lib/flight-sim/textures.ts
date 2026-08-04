@@ -1,5 +1,10 @@
 // Procedural Canvas2D textures so the sim ships with zero external assets.
 // All textures capped at 1024x1024 and use RepeatWrapping for tiling.
+// Intel HD 6xx iGPU mitigations:
+//  - generateMipmaps explicitly set (avoids driver default ambiguity)
+//  - anisotropy capped low (1 in compat mode) since some Intel drivers
+//    report false max-anisotropy values
+//  - minFilter/magFilter explicitly Linear (no mipmaps in compat mode)
 import * as THREE from 'three'
 
 function makeCanvas(size: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
@@ -10,11 +15,30 @@ function makeCanvas(size: number): [HTMLCanvasElement, CanvasRenderingContext2D]
   return [c, ctx]
 }
 
+/** Compatibility mode flag — when true, textures use simpler settings
+ * (no mipmaps, anisotropy=1) to avoid Intel iGPU driver bugs. */
+let compatMode = false
+
+export function setTextureCompatMode(enabled: boolean) {
+  compatMode = enabled
+}
+
 function finalize(canvas: HTMLCanvasElement, repeat = 1, anisotropy = 4): THREE.CanvasTexture {
   const tex = new THREE.CanvasTexture(canvas)
   tex.wrapS = tex.wrapT = repeat > 1 ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping
   if (repeat > 1) tex.repeat.set(repeat, repeat)
-  tex.anisotropy = anisotropy
+  if (compatMode) {
+    // Safe mode: no mipmaps, no anisotropy, simple nearest filtering
+    tex.generateMipmaps = false
+    tex.minFilter = THREE.LinearFilter
+    tex.magFilter = THREE.LinearFilter
+    tex.anisotropy = 1
+  } else {
+    tex.generateMipmaps = true
+    tex.minFilter = THREE.LinearMipmapLinearFilter
+    tex.magFilter = THREE.LinearFilter
+    tex.anisotropy = anisotropy
+  }
   tex.colorSpace = THREE.SRGBColorSpace
   tex.needsUpdate = true
   return tex

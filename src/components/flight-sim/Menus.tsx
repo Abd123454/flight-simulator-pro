@@ -31,6 +31,7 @@ interface Settings {
   sensitivity: number
   volume: number
   muted: boolean
+  compatMode: boolean
 }
 
 export function MainMenu({
@@ -39,12 +40,16 @@ export function MainMenu({
   onAchievements,
   muted,
   onToggleMute,
+  compatMode,
+  onToggleCompat,
 }: {
   onStart: () => void
   onAircraftSelect: () => void
   onAchievements: () => void
   muted: boolean
   onToggleMute: () => void
+  compatMode: boolean
+  onToggleCompat: () => void
 }) {
   return (
     <MenuShell title="Flight Simulator" subtitle="Pro · Multi-Aircraft Combat Edition">
@@ -75,6 +80,13 @@ export function MainMenu({
         className="w-64 border-white/20 bg-white/5 text-white hover:bg-white/10"
       >
         Sound: {muted ? 'Off' : 'On'}
+      </Button>
+      <Button
+        variant="outline"
+        onClick={onToggleCompat}
+        className={`w-64 ${compatMode ? 'border-amber-400/50 bg-amber-950/30 text-amber-200' : 'border-white/20 bg-white/5 text-white hover:bg-white/10'}`}
+      >
+        Compatibility Mode: {compatMode ? 'ON' : 'OFF'}
       </Button>
       <div className="mt-6 max-w-md rounded-lg border border-white/10 bg-black/30 p-4 text-center text-xs leading-relaxed text-white/60">
         <p className="mb-2 font-semibold text-cyan-300/90">4 Aircraft · 4 Mission Types · 10 Achievements</p>
@@ -138,7 +150,27 @@ export function PauseMenu({
             onValueChange={(v) => onSettingsChange({ ...settings, volume: v[0] })}
           />
         </div>
+        {/* Compatibility Mode toggle — for Intel HD 6xx iGPU rendering bugs */}
+        <div className="mt-3 flex items-center justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-widest text-white/70">Compatibility Mode</div>
+            <div className="text-[10px] text-white/40">Disables shadows, AA, rain, reduces terrain detail. For Intel HD 620/630 green-artifact issue.</div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onSettingsChange({ ...settings, compatMode: !settings.compatMode })}
+            className={`border-white/20 text-xs ${settings.compatMode ? 'bg-amber-500/30 border-amber-400/50 text-amber-200' : 'bg-white/5 text-white/60'}`}
+          >
+            {settings.compatMode ? 'ON' : 'OFF'}
+          </Button>
+        </div>
       </div>
+      {settings.compatMode && (
+        <div className="w-80 rounded-md border border-amber-400/30 bg-amber-950/20 p-2 text-center text-[10px] text-amber-200/70">
+          ⚠ Compatibility Mode is ON — restart the flight for changes to take effect
+        </div>
+      )}
       <Button
         variant="outline"
         onClick={onRestart}

@@ -2,6 +2,7 @@
 import * as THREE from 'three'
 import { Sky } from 'three/examples/jsm/objects/Sky.js'
 import { makeGrassTexture } from '../textures'
+import { isCompatMode } from './FlightEngine'
 
 export class Environment {
   group: THREE.Group
@@ -19,7 +20,8 @@ export class Environment {
   // terrain mesh reference (so we can rebuild it when elevation grid changes)
   private terrainMesh: THREE.Mesh | null = null
   private terrainSize = 20000
-  private terrainSegs = 128 // 128x128 = 16,641 verts, single draw call
+  // Reduced segments in compat mode (128→48) to lower GPU vertex load on Intel iGPUs
+  private terrainSegs = isCompatMode() ? 48 : 128
 
   constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
     this.scene = scene
@@ -158,12 +160,18 @@ export class Environment {
       pos.setY(i, h)
     }
     terrainGeo.computeVertexNormals()
-    const grass = makeGrassTexture()
-    grass.wrapS = grass.wrapT = THREE.RepeatWrapping
-    grass.repeat.set(100, 100)
-    const terrainMat = new THREE.MeshStandardMaterial({ map: grass, roughness: 1, metalness: 0 })
+    // In compat mode: flat-color ground (no texture) to isolate texture-driver bugs
+    let terrainMat: THREE.MeshStandardMaterial
+    if (isCompatMode()) {
+      terrainMat = new THREE.MeshStandardMaterial({ color: 0x4a6a3a, roughness: 1, metalness: 0 })
+    } else {
+      const grass = makeGrassTexture()
+      grass.wrapS = grass.wrapT = THREE.RepeatWrapping
+      grass.repeat.set(100, 100)
+      terrainMat = new THREE.MeshStandardMaterial({ map: grass, roughness: 1, metalness: 0 })
+    }
     const terrain = new THREE.Mesh(terrainGeo, terrainMat)
-    terrain.receiveShadow = true
+    terrain.receiveShadow = !isCompatMode()
     terrain.position.y = 0
     this.terrainMesh = terrain
     this.group.add(terrain)
@@ -171,6 +179,11 @@ export class Environment {
 
   /** Update weather visuals (fog density, rain visibility) based on Weather. */
   updateWeather(weather: { fogDensity: number; rainIntensity: number; visibility: number; condition: string }) {
+    // rain particles disabled in compat mode (Intel iGPU mitigation)
+    if (isCompatMode() && this.rainPoints) {
+      this.rainPoints.visible = false
+      return
+    }
     // adjust fog near/far based on visibility
     if (this.fog) {
       this.fog.near = weather.visibility * 0.3

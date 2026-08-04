@@ -164,6 +164,11 @@ export function Hud({ snap, cameraMode }: Props) {
             <div>Geos: {snap.geomMemory}</div>
             <div>Texs: {snap.texMemory}</div>
             <div>Wind: {snap.windSpeed.toFixed(0)}m/s {windCardinal}</div>
+            <div className="mt-1 border-t border-emerald-400/20 pt-1 text-emerald-400/70">
+              GPU: {snap.rendererInfo}
+            </div>
+            <div>Aniso max: {snap.maxAnisotropy}</div>
+            {snap.compatMode && <div className="text-amber-400">⚠ COMPAT MODE</div>}
           </div>
         )}
       </div>

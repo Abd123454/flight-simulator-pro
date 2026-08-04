@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { FlightEngine, type HudSnapshot, type FlightResult } from '@/lib/flight-sim/engine/FlightEngine'
+import { FlightEngine, setCompatMode, type HudSnapshot, type FlightResult } from '@/lib/flight-sim/engine/FlightEngine'
 import type { CameraMode, GamePhase } from '@/lib/flight-sim/types'
 import { AIRCRAFT, type AircraftType } from '@/lib/flight-sim/aircraft-config'
 import { MISSIONS, createMissionState } from '@/lib/flight-sim/missions'
@@ -17,6 +17,7 @@ interface Settings {
   sensitivity: number
   volume: number
   muted: boolean
+  compatMode: boolean
 }
 
 export function FlightSimulator() {
@@ -47,7 +48,7 @@ export function FlightSimulator() {
   const [selectedMissionKey, setSelectedMissionKey] = useState<string>('freeflight')
 
   // apply settings to engine whenever they change
-  const [settings, setSettings] = useState<Settings>({ sensitivity: 1.0, volume: 0.9, muted: false })
+  const [settings, setSettings] = useState<Settings>({ sensitivity: 1.0, volume: 0.9, muted: false, compatMode: false })
 
   useEffect(() => {
     const e = engineRef.current
@@ -62,6 +63,9 @@ export function FlightSimulator() {
     if (screen !== 'game') return
     const container = containerRef.current
     if (!container) return
+
+    // Apply compatibility mode BEFORE constructing the engine (constructor reads it)
+    setCompatMode(settings.compatMode)
 
     const acConfig = AIRCRAFT[selectedAircraft]
     const missionConfig = createMissionState(MISSIONS[selectedMissionKey] || MISSIONS.freeflight)
@@ -171,8 +175,10 @@ export function FlightSimulator() {
         onStart={handleStart}
         onAircraftSelect={() => setScreen('select')}
         onAchievements={() => setScreen('achievements')}
-        muted={muted}
+        muted={settings.muted}
         onToggleMute={handleToggleMute}
+        compatMode={settings.compatMode}
+        onToggleCompat={() => setSettings((s) => ({ ...s, compatMode: !s.compatMode }))}
       />
     )
   }
