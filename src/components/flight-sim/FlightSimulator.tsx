@@ -5,13 +5,16 @@ import type { CameraMode, GamePhase } from '@/lib/flight-sim/types'
 import { AIRCRAFT, type AircraftType } from '@/lib/flight-sim/aircraft-config'
 import { MISSIONS, createMissionState } from '@/lib/flight-sim/missions'
 import { loadProgress, recordMissionResult, type PlayerProgress, type Achievement } from '@/lib/flight-sim/achievements'
-import type { LiveWeatherData, LiveElevationData } from '@/lib/flight-sim/live-weather'
+import type { LiveWeatherData, LiveElevationData, AirportWeather } from '@/lib/flight-sim/live-weather'
+import { LIVE_AIRPORTS, fetchLiveWeather, fetchLiveElevation } from '@/lib/flight-sim/live-weather'
 import { Hud } from './Hud'
 import { MainMenu, PauseMenu, EndScreen } from './Menus'
 import { AircraftSelect } from './AircraftSelect'
 import { AchievementsScreen } from './AchievementsScreen'
+import { DailyFlightScreen } from './DailyFlightScreen'
+import type { DailyFlightConfig } from '@/lib/flight-sim/daily-flight'
 
-type Screen = 'menu' | 'select' | 'game' | 'achievements'
+type Screen = 'menu' | 'select' | 'game' | 'achievements' | 'daily'
 
 interface Settings {
   sensitivity: number
@@ -146,6 +149,21 @@ export function FlightSimulator() {
     setSelectedMissionKey('freeflight')
     setScreen('game')
   }
+  const handleDailyFlight = async (config: DailyFlightConfig) => {
+    setSelectedAircraft(config.aircraftType as AircraftType)
+    setSelectedMissionKey(config.missionType)
+    // Fetch live weather for the daily airport
+    const airport = LIVE_AIRPORTS.find((a) => a.icao === config.airportIcao)
+    if (airport) {
+      const [weather, elevation] = await Promise.all([
+        fetchLiveWeather(airport),
+        fetchLiveElevation(airport),
+      ])
+      liveWeatherRef.current = weather
+      liveElevationRef.current = elevation
+    }
+    setScreen('game')
+  }
   const handleAircraftSelect = (ac: AircraftType, missionKey: string, liveWeather?: LiveWeatherData, liveElevation?: LiveElevationData) => {
     setSelectedAircraft(ac)
     setSelectedMissionKey(missionKey)
@@ -173,10 +191,20 @@ export function FlightSimulator() {
         onStart={handleStart}
         onAircraftSelect={() => setScreen('select')}
         onAchievements={() => setScreen('achievements')}
+        onDailyFlight={() => setScreen('daily')}
         muted={settings.muted}
         onToggleMute={handleToggleMute}
         compatMode={settings.compatMode}
         onToggleCompat={() => setSettings((s) => ({ ...s, compatMode: !s.compatMode }))}
+      />
+    )
+  }
+
+  if (screen === 'daily') {
+    return (
+      <DailyFlightScreen
+        onPlay={handleDailyFlight}
+        onBack={() => setScreen('menu')}
       />
     )
   }

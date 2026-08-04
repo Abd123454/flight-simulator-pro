@@ -39,6 +39,7 @@ export function MainMenu({
   onStart,
   onAircraftSelect,
   onAchievements,
+  onDailyFlight,
   muted,
   onToggleMute,
   compatMode,
@@ -47,6 +48,7 @@ export function MainMenu({
   onStart: () => void
   onAircraftSelect: () => void
   onAchievements: () => void
+  onDailyFlight: () => void
   muted: boolean
   onToggleMute: () => void
   compatMode: boolean
@@ -56,6 +58,13 @@ export function MainMenu({
   const ta = useTranslations('aircraft')
   return (
     <MenuShell title={t('title')} subtitle={t('subtitle')}>
+      <Button
+        size="lg"
+        onClick={onDailyFlight}
+        className="w-64 bg-gradient-to-r from-cyan-500 to-blue-500 text-lg font-bold text-white hover:from-cyan-400 hover:to-blue-400 shadow-lg"
+      >
+        <span aria-hidden="true">📅 </span>Daily Flight
+      </Button>
       <Button
         size="lg"
         onClick={onStart}
