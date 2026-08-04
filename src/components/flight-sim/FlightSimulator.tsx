@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { FlightEngine, setCompatMode, type HudSnapshot, type FlightResult } from '@/lib/flight-sim/engine/FlightEngine'
+import { FlightEngine, type HudSnapshot, type FlightResult } from '@/lib/flight-sim/engine/FlightEngine'
 import type { CameraMode, GamePhase } from '@/lib/flight-sim/types'
 import { AIRCRAFT, type AircraftType } from '@/lib/flight-sim/aircraft-config'
 import { MISSIONS, createMissionState } from '@/lib/flight-sim/missions'
@@ -64,13 +64,11 @@ export function FlightSimulator() {
     const container = containerRef.current
     if (!container) return
 
-    // Apply compatibility mode BEFORE constructing the engine (constructor reads it)
-    setCompatMode(settings.compatMode)
-
     const acConfig = AIRCRAFT[selectedAircraft]
     const missionConfig = createMissionState(MISSIONS[selectedMissionKey] || MISSIONS.freeflight)
 
-    const engine = new FlightEngine(container, acConfig, missionConfig)
+    // Pass compatMode as constructor parameter (no longer module-level)
+    const engine = new FlightEngine(container, acConfig, missionConfig, settings.compatMode)
     engineRef.current = engine
 
     engine.setSensitivity(settings.sensitivity)

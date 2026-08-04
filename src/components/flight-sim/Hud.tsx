@@ -1,8 +1,10 @@
 'use client'
+import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Minimap } from './Minimap'
 import { CompassTape } from './CompassTape'
 import { AltimeterTape } from './AltimeterTape'
+import { convertSpeed, convertAltitude, convertVerticalSpeed, type UnitSystem } from '@/lib/flight-sim/units'
 import type { CameraMode } from '@/lib/flight-sim/types'
 import type { HudSnapshot } from '@/lib/flight-sim/engine/FlightEngine'
 
@@ -71,10 +73,18 @@ export function Hud({ snap, cameraMode }: Props) {
   const t = useTranslations('hud')
   const tc = useTranslations('controls')
   const s = snap.state
-  const speedKmh = Math.round(s.airspeed * 3.6)
+  // Unit system: read from localStorage (persisted), default metric
+  const [unitSystem] = useState<UnitSystem>(() => {
+    if (typeof window === 'undefined') return 'metric'
+    return (localStorage.getItem('flight-sim-units') as UnitSystem) || 'metric'
+  })
+  const speedConv = convertSpeed(s.airspeed, unitSystem)
+  const altConv = convertAltitude(s.altitude, unitSystem)
+  const vsConv = convertVerticalSpeed(s.verticalSpeed, unitSystem)
+  const speedDisplay = speedConv.value
+  const speedUnit = speedConv.unit
   const thr = Math.round(s.throttle * 100)
   const aoa = s.aoa.toFixed(1)
-  const vsiFpm = Math.round(s.verticalSpeed * 196.85)
   const gear = s.gearDown ? t('gearDown') : t('gearUp')
   const modeLabel = cameraMode.toUpperCase()
 
@@ -160,7 +170,7 @@ export function Hud({ snap, cameraMode }: Props) {
         <div className="rounded-md border border-white/20 bg-black/40 px-2 py-0.5 font-mono text-[10px] text-cyan-300">
           {snap.aircraftName} {snap.gamepadConnected && <span className="text-emerald-400" aria-hidden="true">🎮</span>}
         </div>
-        <Panel title={t('speed')} value={String(speedKmh)} unit="km/h" />
+        <Panel title={t('speed')} value={String(speedDisplay)} unit={speedUnit} />
         <Panel title={t('aoa')} value={aoa} unit="°" sub={`β ${s.sideslip.toFixed(0)}°`} warn={stallNear} />
         {snap.afterburner && (
           <div className="animate-pulse rounded-md border border-blue-400/50 bg-blue-950/50 px-2 py-1 text-center font-mono text-[10px] font-bold text-blue-300" role="status" aria-live="polite">
@@ -231,7 +241,7 @@ export function Hud({ snap, cameraMode }: Props) {
           </div>
           <div className="rounded-md border border-cyan-400/30 bg-black/45 px-3 py-1.5 backdrop-blur-sm">
             <div className="text-[10px] font-semibold uppercase tracking-widest text-cyan-300/80">{t('spoilers')}</div>
-            <div className={`font-mono text-sm ${s.spoilers ? 'text-amber-300' : 'text-white/40'}`}>
+            <div className={`font-mono text-sm ${s.spoilers ? 'text-amber-300' : 'text-white/60'}`}>
               {s.spoilers ? t('on') : t('off')}
             </div>
           </div>
@@ -263,7 +273,7 @@ export function Hud({ snap, cameraMode }: Props) {
       </div>
       <div className="absolute start-[calc(50%-100px)] top-1/2 -translate-y-1/2">
         <div className="rounded border border-white/20 bg-black/50 px-1.5 py-0.5 font-mono text-[10px] text-white/70">
-          {t('vs')} {vsiFpm > 0 ? '+' : ''}{vsiFpm}fpm
+          {t('vs')} {vsConv.value > 0 ? '+' : ''}{vsConv.value}{vsConv.unit}
         </div>
       </div>
 

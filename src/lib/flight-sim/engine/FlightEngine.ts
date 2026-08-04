@@ -18,18 +18,9 @@ import type { CameraMode, FlightState, GamePhase } from '../types'
 const STEP = 1 / 60
 const SPAWN_QUAT = new THREE.Quaternion() // identity => facing -Z (north)
 
-// Compatibility mode — set BEFORE constructing FlightEngine.
-// When true: disables shadows, AA, tone mapping, rain, reduces terrain detail,
-// uses simpler texture filtering. Mitigation for Intel HD 6xx iGPU rendering bugs.
-let compatMode = false
-
-export function setCompatMode(enabled: boolean) {
-  compatMode = enabled
-  setTextureCompatMode(enabled)
-}
-
-export function isCompatMode() {
-  return compatMode
+// Compatibility mode type — passed as constructor parameter (not module-level).
+export interface CompatModeConfig {
+  compatMode: boolean
 }
 
 export interface HudSnapshot {
@@ -105,6 +96,8 @@ export class FlightEngine {
   // cached GPU info (computed once, not every frame)
   private cachedRendererInfo = ''
   private cachedMaxAnisotropy = 1
+  // compat mode (instance-level, not module-level)
+  private compatMode: boolean
   // autopilot
   autopilot = false
   autopilotHeading = 0 // degrees, target heading
@@ -132,29 +125,32 @@ export class FlightEngine {
   constructor(
     container: HTMLElement,
     aircraftConfig: AircraftConfig,
-    mission: MissionConfig
+    mission: MissionConfig,
+    compatMode = false
   ) {
     this.container = container
     this.aircraftConfig = aircraftConfig
     this.aircraftPhysics = buildAircraftPhysics(aircraftConfig)
     this.mission = mission
+    this.compatMode = compatMode
+    setTextureCompatMode(compatMode)
     this.state = createInitialState()
 
     const w = container.clientWidth || 1280
     const h = container.clientHeight || 720
 
     this.renderer = new THREE.WebGLRenderer({
-      antialias: !compatMode, // disable AA in compat mode (Intel iGPU driver bug mitigation)
+      antialias: !this.compatMode, // disable AA in compat mode (Intel iGPU driver bug mitigation)
       powerPreference: 'high-performance',
       stencil: false,
     })
     this.renderer.setPixelRatio(1) // always capped at 1.0 for iGPU fill-rate protection
     this.renderer.setSize(w, h)
-    this.renderer.shadowMap.enabled = !compatMode // shadows off in compat mode
+    this.renderer.shadowMap.enabled = !this.compatMode // shadows off in compat mode
     this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     // Disable tone mapping in compat mode — ACES shader can expose driver bugs
-    this.renderer.toneMapping = compatMode ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping
+    this.renderer.toneMapping = this.compatMode ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.05
     container.appendChild(this.renderer.domElement)
     this.renderer.domElement.style.display = 'block'
@@ -189,7 +185,7 @@ export class FlightEngine {
     }, false)
 
     this.scene = new THREE.Scene()
-    this.env = new Environment(this.scene, this.renderer)
+    this.env = new Environment(this.scene, this.renderer, this.compatMode)
     this.airport = new Airport()
     this.scene.add(this.airport.group)
     this.airplane = new Airplane(aircraftConfig)
@@ -570,7 +566,7 @@ export class FlightEngine {
         weatherCondition: this.weather.weather.condition,
         gustActive: this.weather.isGustActive(),
         liveWeatherSource: this.liveWeatherSource,
-        compatMode: compatMode,
+        compatMode: this.compatMode,
         rendererInfo: this.cachedRendererInfo,
         maxAnisotropy: this.cachedMaxAnisotropy,
       })

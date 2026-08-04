@@ -2,7 +2,6 @@
 import * as THREE from 'three'
 import { Sky } from 'three/examples/jsm/objects/Sky.js'
 import { makeGrassTexture } from '../textures'
-import { isCompatMode } from './FlightEngine'
 
 export class Environment {
   group: THREE.Group
@@ -21,10 +20,13 @@ export class Environment {
   private terrainMesh: THREE.Mesh | null = null
   private terrainSize = 20000
   // Reduced segments in compat mode (128→48) to lower GPU vertex load on Intel iGPUs
-  private terrainSegs = isCompatMode() ? 48 : 128
+  private terrainSegs = 128
+  private compatMode: boolean
 
-  constructor(scene: THREE.Scene, _renderer: THREE.WebGLRenderer) {
+  constructor(scene: THREE.Scene, _renderer: THREE.WebGLRenderer, compatMode = false) {
     this.scene = scene
+    this.compatMode = compatMode
+    this.terrainSegs = compatMode ? 48 : 128
     this.group = new THREE.Group()
     scene.add(this.group)
 
@@ -162,7 +164,7 @@ export class Environment {
     terrainGeo.computeVertexNormals()
     // In compat mode: flat-color ground (no texture) to isolate texture-driver bugs
     let terrainMat: THREE.MeshStandardMaterial
-    if (isCompatMode()) {
+    if (this.compatMode) {
       terrainMat = new THREE.MeshStandardMaterial({ color: 0x4a6a3a, roughness: 1, metalness: 0 })
     } else {
       const grass = makeGrassTexture()
@@ -171,7 +173,7 @@ export class Environment {
       terrainMat = new THREE.MeshStandardMaterial({ map: grass, roughness: 1, metalness: 0 })
     }
     const terrain = new THREE.Mesh(terrainGeo, terrainMat)
-    terrain.receiveShadow = !isCompatMode()
+    terrain.receiveShadow = !this.compatMode
     terrain.position.y = 0
     this.terrainMesh = terrain
     this.group.add(terrain)
@@ -180,7 +182,7 @@ export class Environment {
   /** Update weather visuals (fog density, rain visibility) based on Weather. */
   updateWeather(weather: { fogDensity: number; rainIntensity: number; visibility: number; condition: string }) {
     // rain particles disabled in compat mode (Intel iGPU mitigation)
-    if (isCompatMode() && this.rainPoints) {
+    if (this.compatMode && this.rainPoints) {
       this.rainPoints.visible = false
       return
     }
