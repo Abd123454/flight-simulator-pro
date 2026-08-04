@@ -230,7 +230,7 @@ export function stepFlight(
   const speed = Math.hypot(airVx, airVy, airVz)
   _inv.copy(orientation).invert()
   _vLocal.set(airVx, airVy, airVz).applyQuaternion(_inv)
-  let forwardSpeed = -_vLocal.z
+  const forwardSpeed = -_vLocal.z
   const sideSpeed = _vLocal.x
 
   // AoA: only meaningful with forward airspeed. On the ground at low speed,

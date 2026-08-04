@@ -1,0 +1,12 @@
+{
+  "name": "Flight Simulator Pro",
+  "short_name": "FlightSim",
+  "description": "A lightweight arcade-style browser flight simulator with real weather and 4 aircraft.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#06b6d4",
+  "icons": [
+    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

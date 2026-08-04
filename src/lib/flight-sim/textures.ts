@@ -11,7 +11,8 @@ function makeCanvas(size: number): [HTMLCanvasElement, CanvasRenderingContext2D]
   const c = document.createElement('canvas')
   c.width = size
   c.height = size
-  const ctx = c.getContext('2d')!
+  const ctx = c.getContext('2d')
+  if (!ctx) throw new Error('Canvas 2D context not available')
   return [c, ctx]
 }
 
@@ -103,7 +104,8 @@ export function makeRunwayTexture(): THREE.CanvasTexture {
   const c = document.createElement('canvas')
   c.width = w
   c.height = h
-  const ctx = c.getContext('2d')!
+  const ctx = c.getContext('2d')
+  if (!ctx) throw new Error('Canvas 2D context not available')
   asphaltBase(ctx, h > w ? w : w, '#3a3a3a') // fill via rects since non-square
   // re-fill properly (asphaltBase assumes square; do manually)
   ctx.fillStyle = '#3a3a3e'

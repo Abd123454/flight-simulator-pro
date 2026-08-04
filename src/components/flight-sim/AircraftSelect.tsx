@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { AIRCRAFT_LIST, type AircraftType } from '@/lib/flight-sim/aircraft-config'
-import { MISSIONS, CAMPAIGN, type MissionConfig } from '@/lib/flight-sim/missions'
+import { MISSIONS, CAMPAIGN } from '@/lib/flight-sim/missions'
 import { LIVE_AIRPORTS, fetchLiveWeather, fetchLiveElevation, type LiveWeatherData, type LiveElevationData } from '@/lib/flight-sim/live-weather'
 
 interface Props {
@@ -51,7 +51,7 @@ export function AircraftSelect({ onSelect, onBack, completedMissions }: Props) {
   const [liveElevation, setLiveElevation] = useState<LiveElevationData | null>(null)
   const [liveStatus, setLiveStatus] = useState<string>('')
 
-  const aircraft = AIRCRAFT_LIST.find((a) => a.type === selectedAircraft)!
+  const aircraft = AIRCRAFT_LIST.find((a) => a.type === selectedAircraft) ?? AIRCRAFT_LIST[0]
   const mission = MISSIONS[selectedMissionKey]
   const completedSet = new Set(completedMissions)
 

@@ -39,7 +39,7 @@ export function FlightSimulator() {
   const [landingVSpeed, setLandingVSpeed] = useState(0)
   const [landingSpeed, setLandingSpeed] = useState(0)
   const [finalScore, setFinalScore] = useState(0)
-  const [muted, setMuted] = useState(false)
+  // muted state is tracked via settings.muted
   const [newAchievements, setNewAchievements] = useState<Achievement[]>([])
   const [progress, setProgress] = useState<PlayerProgress>(() => loadProgress())
 
@@ -166,7 +166,7 @@ export function FlightSimulator() {
   }
   const handleToggleMute = () => {
     setSettings((s) => ({ ...s, muted: !s.muted }))
-    setMuted((m) => !m)
+    
   }
 
   if (screen === 'menu') {

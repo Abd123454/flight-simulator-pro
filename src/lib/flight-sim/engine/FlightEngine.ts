@@ -9,7 +9,7 @@ import { InputController } from './InputController'
 import { AudioEngine } from './AudioEngine'
 import { LODCuller } from './LODCuller'
 import { stepFlight, createInitialState, PHYS, buildAircraftPhysics } from '../physics'
-import { WeatherSystem } from '../weather'
+import { WeatherSystem, type WeatherCondition } from "../weather"
 import { setTextureCompatMode } from '../textures'
 import type { AircraftConfig } from '../aircraft-config'
 import type { MissionConfig, Waypoint, Target } from '../missions'
@@ -393,7 +393,7 @@ export class FlightEngine {
       // weather cycle (keys 1-4)
       if (this.input.consumeWeatherCycle()) {
         const conds = ['clear', 'cloudy', 'rain', 'storm'] as const
-        const idx = conds.indexOf(this.weather.weather.condition as any)
+        const idx = conds.indexOf(this.weather.weather.condition as WeatherCondition)
         const next = conds[(idx + 1) % conds.length]
         this.weather.setCondition(next)
       }

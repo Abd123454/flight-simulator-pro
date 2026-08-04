@@ -29,7 +29,7 @@ export class AudioEngine {
       this.ctx?.resume()
       return
     }
-    const Ctx = window.AudioContext || (window as any).webkitAudioContext
+    const Ctx = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     this.ctx = new Ctx()
     const ctx = this.ctx
 

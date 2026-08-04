@@ -70,8 +70,10 @@ export class Airport {
 
     // connector taxiways linking runway to apron
     const connMat = new THREE.MeshStandardMaterial({ map: makeConcreteTexture(), roughness: 0.95 })
-    const connTex = connMat.map!
-    connTex.wrapS = connTex.wrapT = THREE.RepeatWrapping
+    const connTex = connMat.map
+    if (connTex) {
+      connTex.wrapS = connTex.wrapT = THREE.RepeatWrapping
+    }
     const connectors = [-1100, 0, 1100]
     for (const cz of connectors) {
       const cg = new THREE.PlaneGeometry(170, 25)

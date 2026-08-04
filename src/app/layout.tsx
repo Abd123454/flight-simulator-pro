@@ -13,10 +13,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Flight Simulator Pro",
-  description: "A lightweight arcade-style browser flight simulator built with Three.js — no external assets, runs on integrated graphics.",
-  keywords: ["flight simulator", "Three.js", "WebGL", "browser game", "arcade"],
+  title: "Flight Simulator Pro — Free Browser Flight Sim",
+  description: "A lightweight arcade-style browser flight simulator with real weather, 4 aircraft, 6 missions, and 12 achievements. Built with Three.js + Next.js.",
+  keywords: ["flight simulator", "Three.js", "WebGL", "browser game", "F-16", "Boeing 737", "arcade"],
   authors: [{ name: "Abd123454" }],
+  manifest: "/manifest.webmanifest",
+  openGraph: {
+    title: "Flight Simulator Pro",
+    description: "Free browser flight simulator with real weather, 4 aircraft, and dynamic terrain.",
+    type: "website",
+    siteName: "Flight Simulator Pro",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Flight Simulator Pro",
+    description: "Free browser flight simulator with real weather, 4 aircraft, and dynamic terrain.",
+  },
 };
 
 export default function RootLayout({
@@ -26,6 +38,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <meta name="theme-color" content="#06b6d4" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >

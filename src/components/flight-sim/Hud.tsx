@@ -128,12 +128,12 @@ export function Hud({ snap, cameraMode }: Props) {
             snap.weatherCondition === 'rain' ? 'text-blue-400' :
             snap.weatherCondition === 'cloudy' ? 'text-slate-400' : 'text-yellow-400'
           }`}>
-            {snap.weatherCondition === 'clear' ? '☀' :
+            <span aria-hidden="true">{snap.weatherCondition === 'clear' ? '☀' :
              snap.weatherCondition === 'cloudy' ? '☁' :
-             snap.weatherCondition === 'rain' ? '🌧' : '⛈'}
+             snap.weatherCondition === 'rain' ? '🌧' : '⛈'}</span>
             {' '}{snap.weatherCondition.toUpperCase()}
             {snap.liveWeatherSource && <span className="text-emerald-400"> · LIVE</span>}
-            {snap.gustActive && <span className="text-orange-400 animate-pulse"> GUST!</span>}
+            {snap.gustActive && <span className="text-orange-400 animate-pulse" aria-label="gust warning"> GUST!</span>}
           </span>
           {/* Autopilot indicator */}
           {snap.autopilot && (
@@ -147,13 +147,13 @@ export function Hud({ snap, cameraMode }: Props) {
       {/* Top-left: speed + AoA + aircraft name */}
       <div className="absolute left-3 top-14 flex flex-col gap-2">
         <div className="rounded-md border border-white/20 bg-black/40 px-2 py-0.5 font-mono text-[10px] text-cyan-300">
-          {snap.aircraftName} {snap.gamepadConnected && <span className="text-emerald-400">🎮</span>}
+          {snap.aircraftName} {snap.gamepadConnected && <span className="text-emerald-400" aria-hidden="true">🎮</span>}
         </div>
         <Panel title="Speed" value={String(speedKmh)} unit="km/h" />
         <Panel title="AoA" value={aoa} unit="°" sub={`β ${s.sideslip.toFixed(0)}°`} warn={stallNear} />
         {snap.afterburner && (
-          <div className="animate-pulse rounded-md border border-blue-400/50 bg-blue-950/50 px-2 py-1 text-center font-mono text-[10px] font-bold text-blue-300">
-            ⚡ AFTERBURNER
+          <div className="animate-pulse rounded-md border border-blue-400/50 bg-blue-950/50 px-2 py-1 text-center font-mono text-[10px] font-bold text-blue-300" role="status" aria-live="polite">
+            <span aria-hidden="true">⚡</span> AFTERBURNER
           </div>
         )}
         {snap.debug && (
@@ -258,10 +258,11 @@ export function Hud({ snap, cameraMode }: Props) {
 
       {/* Stall warning */}
       {(stallOn || stallNear) && (
-        <div className={`absolute left-1/2 top-[26%] -translate-x-1/2 rounded-md border px-4 py-1.5 font-mono text-lg font-bold ${
+        <div role="alert" aria-live="assertive" className={`absolute left-1/2 top-[26%] -translate-x-1/2 rounded-md border px-4 py-1.5 font-mono text-lg font-bold ${
           stallOn ? 'animate-pulse border-red-500 bg-red-900/50 text-red-300' : 'border-orange-500/70 bg-orange-900/40 text-orange-300'
         }`}>
-          {stallOn ? '⚠ STALL ⚠' : '⚠ APPROACHING STALL'}
+          <span aria-hidden="true">{stallOn ? '⚠ STALL ⚠' : '⚠ APPROACHING STALL'}</span>
+          <span className="sr-only">{stallOn ? 'Stall warning' : 'Approaching stall'}</span>
         </div>
       )}
 

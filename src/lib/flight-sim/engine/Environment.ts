@@ -23,7 +23,7 @@ export class Environment {
   // Reduced segments in compat mode (128→48) to lower GPU vertex load on Intel iGPUs
   private terrainSegs = isCompatMode() ? 48 : 128
 
-  constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
+  constructor(scene: THREE.Scene, _renderer: THREE.WebGLRenderer) {
     this.scene = scene
     this.group = new THREE.Group()
     scene.add(this.group)
