@@ -298,8 +298,8 @@ export class Environment {
   }
 
   private buildClouds() {
-    // Simple flat billboard clouds: a few flattened spheres grouped into puffs.
-    // They don't cast shadows (cheap) and sit at high altitude.
+    // InstancedMesh clouds — all puffs share one geometry + material,
+    // rendering in a single draw call (was ~80 individual meshes).
     const cloudMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       transparent: true,
@@ -307,30 +307,40 @@ export class Environment {
       roughness: 1,
       metalness: 0,
     })
+    const cloudGeo = new THREE.SphereGeometry(1, 6, 5) // unit sphere, scaled per-instance
+    // total puff count: 18 clouds × ~5 puffs = ~90 instances
+    const totalPuffs = 90
+    const instancedClouds = new THREE.InstancedMesh(cloudGeo, cloudMat, totalPuffs)
+    instancedClouds.castShadow = false
+    instancedClouds.receiveShadow = false
+
+    const m = new THREE.Matrix4()
+    const pos = new THREE.Vector3()
+    const quat = new THREE.Quaternion()
+    const scl = new THREE.Vector3()
+    let idx = 0
+
     for (let i = 0; i < 18; i++) {
-      const cloud = new THREE.Group()
+      const cloudAngle = Math.random() * Math.PI * 2
+      const cloudDist = 800 + Math.random() * 4000
+      const cloudX = Math.cos(cloudAngle) * cloudDist
+      const cloudY = 600 + Math.random() * 300
+      const cloudZ = Math.sin(cloudAngle) * cloudDist
       const puffCount = 3 + Math.floor(Math.random() * 4)
-      for (let p = 0; p < puffCount; p++) {
+      for (let p = 0; p < puffCount && idx < totalPuffs; p++, idx++) {
         const r = 40 + Math.random() * 50
-        const puff = new THREE.Mesh(new THREE.SphereGeometry(r, 6, 5), cloudMat)
-        puff.position.set(
-          (Math.random() - 0.5) * 120,
-          (Math.random() - 0.5) * 15,
-          (Math.random() - 0.5) * 120
+        pos.set(
+          cloudX + (Math.random() - 0.5) * 120,
+          cloudY + (Math.random() - 0.5) * 15,
+          cloudZ + (Math.random() - 0.5) * 120
         )
-        puff.scale.y = 0.4 // flatten
-        cloud.add(puff)
+        scl.set(r, r * 0.4, r) // flatten y
+        m.compose(pos, quat, scl)
+        instancedClouds.setMatrixAt(idx, m)
       }
-      // scatter around the airport area at 600-900m altitude
-      const angle = Math.random() * Math.PI * 2
-      const dist = 800 + Math.random() * 4000
-      cloud.position.set(
-        Math.cos(angle) * dist,
-        600 + Math.random() * 300,
-        Math.sin(angle) * dist
-      )
-      this.group.add(cloud)
     }
+    instancedClouds.instanceMatrix.needsUpdate = true
+    this.group.add(instancedClouds)
   }
 
   dispose() {

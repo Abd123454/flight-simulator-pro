@@ -97,7 +97,7 @@ export function Hud({ snap, cameraMode }: Props) {
 
       {/* Mission status bar (below compass) */}
       <div className="absolute left-1/2 top-12 -translate-x-1/2">
-        <div className="flex items-center gap-4 rounded-md border border-white/15 bg-black/50 px-4 py-1 backdrop-blur-sm">
+        <div role="status" aria-live="polite" className="flex items-center gap-4 rounded-md border border-white/15 bg-black/50 px-4 py-1 backdrop-blur-sm">
           <span className="font-mono text-xs text-amber-300">{snap.missionName}</span>
           {totalCount > 0 && (
             <span className="font-mono text-xs text-cyan-300">

@@ -174,6 +174,20 @@ export class FlightEngine {
     }
     this.cachedMaxAnisotropy = this.renderer.capabilities?.getMaxAnisotropy?.() ?? 1
 
+    // Handle WebGL context loss (Windows sleep/wake, GPU driver crash).
+    // Without this, the app dies silently — the canvas goes black and
+    // requestAnimationFrame keeps running but nothing renders.
+    this.renderer.domElement.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault()
+      cancelAnimationFrame(this.raf)
+      console.warn('[FlightSim] WebGL context lost — pausing render loop')
+    }, false)
+    this.renderer.domElement.addEventListener('webglcontextrestored', () => {
+      console.info('[FlightSim] WebGL context restored — resuming')
+      this.lastTime = performance.now()
+      this.loop()
+    }, false)
+
     this.scene = new THREE.Scene()
     this.env = new Environment(this.scene, this.renderer)
     this.airport = new Airport()
