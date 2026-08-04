@@ -186,16 +186,16 @@ export class Airport {
   private buildPAPI(x: number, y: number, z: number, dir: number) {
     const papiGroup = new THREE.Group()
     for (let i = 0; i < 4; i++) {
-      // alternate: outer two = red (low), inner two = white (high) — simplified
-      // static appearance; actual color logic computed in update() is complex,
-      // so we show a fixed pattern: 2 white (far) + 2 red (near) = on slope.
       const isRed = i < 2
       const mat = new THREE.MeshStandardMaterial({
         color: isRed ? 0xff2020 : 0xffffff,
         emissive: isRed ? 0xff1010 : 0xffffcc,
         emissiveIntensity: 2.5,
       })
-      const light = new THREE.Mesh(new THREE.SphereGeometry(0.8, 8, 8), mat)
+      // Shape distinction for colorblind accessibility:
+      // Red lights = cones (pointing up), White lights = spheres
+      const geo = isRed ? new THREE.ConeGeometry(0.8, 1.2, 6) : new THREE.SphereGeometry(0.8, 8, 8)
+      const light = new THREE.Mesh(geo, mat)
       light.position.set(i * 5 - 7.5, 1.5, 0)
       papiGroup.add(light)
     }
