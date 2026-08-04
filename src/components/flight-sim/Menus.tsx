@@ -1,4 +1,6 @@
 'use client'
+import { useTranslations } from 'next-intl'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import type { FlightResult } from '@/lib/flight-sim/engine/FlightEngine'
@@ -50,55 +52,60 @@ export function MainMenu({
   compatMode: boolean
   onToggleCompat: () => void
 }) {
+  const t = useTranslations('menu')
+  const ta = useTranslations('aircraft')
   return (
-    <MenuShell title="Flight Simulator" subtitle="Pro · Multi-Aircraft Combat Edition">
+    <MenuShell title={t('title')} subtitle={t('subtitle')}>
       <Button
         size="lg"
         onClick={onStart}
         className="w-64 bg-cyan-500 text-lg font-bold text-slate-950 hover:bg-cyan-400"
       >
-        Quick Flight (737)
+        {t('quickFlight')}
       </Button>
       <Button
         variant="outline"
         onClick={onAircraftSelect}
         className="w-64 border-amber-400/40 bg-amber-950/20 text-amber-200 hover:bg-amber-900/30"
       >
-        ✈ Select Aircraft & Mission
+        <span aria-hidden="true">✈ </span>{t('selectAircraft')}
       </Button>
       <Button
         variant="outline"
         onClick={onAchievements}
         className="w-64 border-emerald-400/40 bg-emerald-950/20 text-emerald-200 hover:bg-emerald-900/30"
       >
-        🏆 Achievements
+        <span aria-hidden="true">🏆 </span>{t('achievements')}
       </Button>
       <Button
         variant="outline"
         onClick={onToggleMute}
         className="w-64 border-white/20 bg-white/5 text-white hover:bg-white/10"
       >
-        Sound: {muted ? 'Off' : 'On'}
+        {t('sound')}: {muted ? t('soundOff') : t('soundOn')}
       </Button>
       <Button
         variant="outline"
         onClick={onToggleCompat}
         className={`w-64 ${compatMode ? 'border-amber-400/50 bg-amber-950/30 text-amber-200' : 'border-white/20 bg-white/5 text-white hover:bg-white/10'}`}
       >
-        Compatibility Mode: {compatMode ? 'ON' : 'OFF'}
+        {t('compatMode')}: {compatMode ? 'ON' : 'OFF'}
       </Button>
+      {/* Language switcher */}
+      <div className="flex gap-2">
+        <Link href="/en" className="rounded border border-white/15 px-2 py-0.5 text-[10px] text-white/60 hover:border-white/30">EN</Link>
+        <Link href="/ar" className="rounded border border-white/15 px-2 py-0.5 text-[10px] text-white/60 hover:border-white/30">العربية</Link>
+      </div>
       <div className="mt-6 max-w-md rounded-lg border border-white/10 bg-black/30 p-4 text-center text-xs leading-relaxed text-white/60">
-        <p className="mb-2 font-semibold text-cyan-300/90">4 Aircraft · 6 Missions · 12 Achievements</p>
-        Fly the <span className="text-white/80">737 Airliner</span>, <span className="text-amber-300">F-16 Fighter</span> (with afterburner),
-        <span className="text-red-300"> Extra 300 Stunt</span>, or <span className="text-green-300">C-130 Cargo</span>.
-        Choose Free Flight, Canyon Sprint Race, Landing Challenge, or Target Practice.
-        Now with dynamic weather (clear/cloudy/rain/storm) and autopilot.
+        <p className="mb-2 font-semibold text-cyan-300/90">4 {ta('airliner').split(' ')[0]} · 6 Missions · 12 Achievements</p>
+        <span className="text-white/80">{ta('airliner')}</span>, <span className="text-amber-300">{ta('fighter')}</span> (afterburner),
+        <span className="text-red-300"> {ta('stunt')}</span>, <span className="text-green-300">{ta('cargo')}</span>.
       </div>
       <div className="mt-3 max-w-md rounded-lg border border-amber-400/20 bg-amber-950/20 p-3 text-center text-[10px] leading-relaxed text-amber-200/60">
-        <span className="font-mono">W/S</span> pitch · <span className="font-mono">A/D</span> roll ·{' '}
-        <span className="font-mono">Shift</span> throttle · <span className="font-mono">G</span> gear ·{' '}
-        <span className="font-mono">F/V</span> flaps · <span className="font-mono">1-4</span> weather ·{' '}
-        <span className="font-mono">P</span> autopilot · <span className="font-mono">C</span> camera
+        <kbd className="font-mono">W/S</kbd> pitch · <kbd className="font-mono">A/D</kbd> roll ·{' '}
+        <kbd className="font-mono">Shift</kbd> throttle · <kbd className="font-mono">G</kbd> gear ·{' '}
+        <kbd className="font-mono">F/V</kbd> flaps · <kbd className="font-mono">1-4</kbd> weather ·{' '}
+        <kbd className="font-mono">P</kbd> autopilot · <kbd className="font-mono">C</kbd> camera
       </div>
     </MenuShell>
   )

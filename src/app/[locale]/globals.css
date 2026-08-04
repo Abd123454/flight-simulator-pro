@@ -142,3 +142,13 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* High-contrast mode for accessibility */
+@media (forced-colors: active) {
+  * {
+    border-color: CanvasText !important;
+  }
+  button {
+    border: 2px solid CanvasText !important;
+  }
+}

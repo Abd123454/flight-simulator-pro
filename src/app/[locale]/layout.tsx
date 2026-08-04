@@ -1,6 +1,7 @@
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
+import { StructuredData } from "./structured-data";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -44,6 +45,7 @@ export default async function LocaleLayout({
         <meta name="theme-color" content="#06b6d4" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}>
+        <StructuredData />
         <NextIntlClientProvider>{children}</NextIntlClientProvider>
       </body>
     </html>

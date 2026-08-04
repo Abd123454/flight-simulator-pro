@@ -268,15 +268,15 @@ export function Hud({ snap, cameraMode }: Props) {
 
       {/* Controls hint */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-md border border-white/15 bg-black/40 px-3 py-1 font-mono text-[10px] text-white/70 backdrop-blur-sm">
-        <span className="text-cyan-300">W/S</span> pitch ·{' '}
-        <span className="text-cyan-300">A/D</span> roll ·{' '}
-        <span className="text-cyan-300">Shift/Ctrl</span> throttle ·{' '}
-        <span className="text-cyan-300">G</span> gear ·{' '}
-        <span className="text-cyan-300">F/V</span> flaps ·{' '}
-        <span className="text-cyan-300">C</span> camera ·{' '}
-        <span className="text-cyan-300">1-4</span> weather ·{' '}
-        <span className="text-cyan-300">P</span> autopilot ·{' '}
-        <span className="text-cyan-300">Esc</span> pause
+        <kbd className="text-cyan-300">W/S</kbd> pitch ·{' '}
+        <kbd className="text-cyan-300">A/D</kbd> roll ·{' '}
+        <kbd className="text-cyan-300">Shift/Ctrl</kbd> throttle ·{' '}
+        <kbd className="text-cyan-300">G</kbd> gear ·{' '}
+        <kbd className="text-cyan-300">F/V</kbd> flaps ·{' '}
+        <kbd className="text-cyan-300">C</kbd> camera ·{' '}
+        <kbd className="text-cyan-300">1-4</kbd> weather ·{' '}
+        <kbd className="text-cyan-300">P</kbd> autopilot ·{' '}
+        <kbd className="text-cyan-300">Esc</kbd> pause
       </div>
     </div>
   )
